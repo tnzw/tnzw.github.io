@@ -1,0 +1,78 @@
+Version 20190121
+
+
+vocabulary :
+
+something block = is a non-divisable part of something
+something token = is equal to a block, but for some other uses like language parsing
+something chunk = is composed of several blocks or block parts.
+
+
+algorithms : (TOO COMPLEX !!)
+
+xToYAlgorithm(state, readArray, ri, rl, writeArray, wi, wl, close, blockCount) -> state = {readLength: int, writeLength: int, error: string, blockCount: int, [warning: string, ...]}
+    function should contain a loop that iterate over readArray
+    function should write in writeArray the remaining Y to write from state before starting the loop
+    loop should stop on error, or warning
+    on error no left space on buffer, function should store wanted Y to write in state
+    on warning, function should store the wanted Y to write in state
+    state.blockCount should be incremented after read of one beginning of a block in readArray
+    blockCount could be reach when a block has been completely read
+    loop should be broken on blockCount reached
+    close should be handled after the loop
+
+  base64ByteToByteAlgorithm
+  byteToBase64ByteAlgorithm
+  utf8ByteToCodePointAlgorithm
+  codePointToUtf8ByteAlgorithm
+  codePointToUtf16ShortAlgorithm
+  codePointToUtf16BigEndianByteAlgorithm
+  codePointToUtf16LittleEndianByteAlgorithm
+  byteToJsonTokenAlgorithm
+  jsonTokenToByteAlgorithm
+
+
+decoders (1 block at a time) :
+
+decodeXFromY(y)                        -> {result: x                    , error: string[, warnings: string, ...]}
+decodeXFromYArray(yArray, yi, yl)      -> {result: x       , length: int, error: string[, warnings: string, ...]}
+decodeXArrayFromYArray(yArray, yi, yl) -> {result: array<x>, length: int, error: string[, warnings: string, ...]}
+    func should decode one block
+    func should not stop on any warning
+    func should stop on any error
+    warnings should be comma separated
+
+  decodeCodePointFromUtf8ByteArray
+  decodeByteArrayFromBase64ByteArray
+
+
+encoders (1 block at a time) :
+
+encodeXToY(x)                          -> {result: y                    , error: string[, warnings: string, ...]}
+encodeXArrayToY(xArray, xi, xl)        -> {result: y       , length: int, error: string[, warnings: string, ...]}
+encodeXArrayToYArray(xArray, xi, xl)   -> {result: array<y>, length: int, error: string[, warnings: string, ...]}
+
+  encodeCodePointToUtf8ByteArray
+  encodeByteArrayToBase64ByteArray
+
+
+converters / creators :
+
+function createXFromY(y) -> x  ???-> throw new createXFromY.CreateError
+function createXFromYArray(yArray, yi, yl) -> x  ???-> throw new createXFromYArray.CreateError
+
+
+parsers / stringifiers :
+
+function parseX(string) -> x  ???-> throw new parseX.SyntaxError
+function stringifyToX(x) -> string
+
+
+enciphers / deciphers :
+???
+
+
+extractors :
+
+function extractXFromY(y) -> x
+  parse Y to find X and return it.
