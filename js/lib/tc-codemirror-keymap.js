@@ -7,7 +7,7 @@
    mostly thank to the Alt button.
   */
 
-  /*! tc-codemirror-keymap.js Version 20190307
+  /*! tc-codemirror-keymap.js Version 20190405
 
       Copyright (c) 2015-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
