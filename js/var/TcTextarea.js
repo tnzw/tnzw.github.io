@@ -1,7 +1,7 @@
 this.TcTextarea = (function script() {
   "use strict";
 
-  /*! TcTextarea.js Version 1.0.0
+  /*! TcTextarea.js Version 1.0.1
 
       Copyright (c) 2016-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -249,43 +249,104 @@ this.TcTextarea = (function script() {
     var textarea = this._textarea;
     return textarea.selectionDirection[0] === "f" ? textarea.selectionEnd : textarea.selectionStart;
   };
-  TcTextarea.prototype.getColumnPosition = function (pos) { pos = pos|0; return /[^\n]*$/.exec(this._textarea.value.slice(0, pos))[0].length; }
-  TcTextarea.prototype.getPreviousGroupPosition = function (pos) { pos = pos|0; return pos - /(\n|(\w+|[ \t]+|[^\w\s]+)?[ \t]?)$/.exec(this._textarea.value.slice(0, pos))[0].length; }
-  TcTextarea.prototype.getNextGroupPosition = function (pos) { pos = pos|0; return pos + /^(\n|[ \t]?(\w+|[ \t]+|[^\w\s]+)?)/.exec(this._textarea.value.slice(pos))[0].length; }
-  TcTextarea.prototype.getPreviousWordPosition = function (pos) { pos = pos|0; return pos - /\w*[^\w]*$/.exec(this._textarea.value.slice(0, pos))[0].length; }
-  TcTextarea.prototype.getNextWordPosition = function (pos) { pos = pos|0; return pos + /^[^\w]*\w*/.exec(this._textarea.value.slice(pos))[0].length; }
-  TcTextarea.prototype.getPreviousWordNlPosition = function (pos) { pos = pos|0; return pos - /\w*[^\w\n]*\n?$/.exec(this._textarea.value.slice(0, pos))[0].length; }
-  TcTextarea.prototype.getNextWordNlPosition = function (pos) { pos = pos|0; return pos + /^\n?[^\w\n]*\w*/.exec(this._textarea.value.slice(pos))[0].length; }
-  TcTextarea.prototype.getLineStartPosition = function (pos) { pos = pos|0; return pos - /[^\n]*$/.exec(this._textarea.value.slice(0, pos))[0].length; }
-  TcTextarea.prototype.getLineEndPosition = function (pos) { pos = pos|0; return pos + /^[^\n]*/.exec(this._textarea.value.slice(pos))[0].length; }
-  TcTextarea.prototype.getLineUpPosition = function (pos) {
+  TcTextarea.prototype.getColumnPosition = function (pos) {
     pos = pos|0;
-    var tmp = /([^\n]*)\n([^\n]*)$/.exec(this._textarea.value.slice(0, pos)), col;
-    if (tmp) {
-      col = tmp[2].length;
-      if (tmp[1].length >= col) { return pos - tmp[2].length - 1 - (tmp[1].length - col); }
-      return pos - tmp[2].length - 1;
+    return pos - this._textarea.value.lastIndexOf("\n", pos - 1) - 1;
+  };
+  TcTextarea.prototype.getPreviousGroupPosition = function (pos) {
+    pos = pos|0;
+    function st(c) { return c === " " || c === "\t"; }
+    function s(c) { return " \f\n\r\t\v".indexOf(c) !== -1; }
+    function w(c) {
+      return (c >= "a" && c <= "z") ||
+        (c >= "A" && c <= "Z") ||
+        (c >= "0" && c <= "9") ||
+        c === "_";
+    }
+    var value = this._textarea.value;
+    if (pos <= 1) { return 0; }
+    pos -= 1;
+    if (value[pos] === "\n") { return pos; }
+    if (st(value[pos])) { pos -= 1; if (pos <= 1) { return 0; } }
+    if (w(value[pos])) {
+      for (; pos < value.length && w(value[pos]); pos -= 1) {}
+      return pos + 1;
+    }
+    if (st(value[pos])) {
+      for (; pos < value.length && st(value[pos]); pos -= 1) {}
+      return pos + 1;
+    }
+    if (!w(value[pos]) && !s(value[pos])) {
+      for (; pos < value.length && !w(value[pos]) && !s(value[pos]); pos -= 1) {}
+      return pos + 1;
     }
     return 0;
-  }
+  };
+  TcTextarea.prototype.getNextGroupPosition = function (pos) {
+    pos = pos|0;
+    function st(c) { return c === " " || c === "\t"; }
+    function s(c) { return " \f\n\r\t\v".indexOf(c) !== -1; }
+    function w(c) {
+      return (c >= "a" && c <= "z") ||
+        (c >= "A" && c <= "Z") ||
+        (c >= "0" && c <= "9") ||
+        c === "_";
+    }
+    var value = this._textarea.value;
+    if (value.length < pos) { return value.length; }
+    if (value[pos] === "\n") { return pos + 1; }
+    if (st(value[pos])) { pos += 1; if (value.length < pos) { return value.length; } }
+    if (w(value[pos])) {
+      for (; pos < value.length && w(value[pos]); pos += 1) {}
+      return pos;
+    }
+    if (st(value[pos])) {
+      for (; pos < value.length && st(value[pos]); pos += 1) {}
+      return pos;
+    }
+    if (!w(value[pos]) && !s(value[pos])) {
+      for (; pos < value.length && !w(value[pos]) && !s(value[pos]); pos += 1) {}
+      return pos;
+    }
+    return value.length;
+  };
+  TcTextarea.prototype.getPreviousWordPosition = function (pos) { pos = pos|0; return pos - /\w*[^\w]*$/.exec(this._textarea.value.slice(0, pos))[0].length; };  // XXX needs to be optimized
+  TcTextarea.prototype.getNextWordPosition = function (pos) { pos = pos|0; return pos + /^[^\w]*\w*/.exec(this._textarea.value.slice(pos))[0].length; };  // XXX needs to be optimized
+  TcTextarea.prototype.getPreviousWordNlPosition = function (pos) { pos = pos|0; return pos - /\w*[^\w\n]*\n?$/.exec(this._textarea.value.slice(0, pos))[0].length; };  // XXX needs to be optimized
+  TcTextarea.prototype.getNextWordNlPosition = function (pos) { pos = pos|0; return pos + /^\n?[^\w\n]*\w*/.exec(this._textarea.value.slice(pos))[0].length; };  // XXX needs to be optimized
+  TcTextarea.prototype.getLineStartPosition = function (pos) {
+    pos = pos|0;
+    return this._textarea.value.lastIndexOf("\n", pos - 1) + 1;
+  };
+  TcTextarea.prototype.getLineEndPosition = function (pos) {
+    pos = pos|0;
+    var end = this._textarea.value.indexOf("\n", pos);
+    return end === -1 ? this._textarea.value.length : end;
+  };
+  TcTextarea.prototype.getLineUpPosition = function (pos) {
+    pos = pos|0;
+    var start = this._textarea.value.lastIndexOf("\n", pos - 1);
+    if (start === -1) { return 0; }
+    return Math.min(this._textarea.value.lastIndexOf("\n", start - 1) + pos - start, start);
+  };
   TcTextarea.prototype.getLineDownPosition = function (pos) {
     pos = pos|0;
-    var tmp = /[^\n]*$/.exec(this._textarea.value.slice(0, pos))[0].length,
-        col = tmp, start = pos - tmp;
-    tmp = /^([^\n]*\n)([^\n]*)/.exec(this._textarea.value.slice(pos));
-    if (tmp) {
-      if (tmp[2].length >= col) { return pos + tmp[1].length + col; }
-      return pos + tmp[1].length + tmp[2].length;
-    }
-    return this._textarea.value.length;
-  }
-  TcTextarea.prototype.getCursorColumnPosition = function () { return this.getColumnPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorPreviousGroupPosition = function () { return this.getPreviousGroupPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorNextGroupPosition = function () { return this.getNextGroupPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorLineStartPosition = function () { return this.getLineStartPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorLineEndPosition = function () { return this.getLineEndPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorLineUpPosition = function () { return this.getLineUpPosition(this.getCursorPosition()); }
-  TcTextarea.prototype.getCursorLineDownPosition = function () { return this.getLineDownPosition(this.getCursorPosition()); }
+    var start = 0,
+        downend = 0,
+        end = this._textarea.value.indexOf("\n", pos);
+    if (end === -1) { return this._textarea.value.length; }
+    start = this._textarea.value.lastIndexOf("\n", pos - 1);
+    downend = this._textarea.value.indexOf("\n", end + 1);
+    if (downend === -1) { return end + pos - start; }
+    return Math.min(downend, end + pos - start);
+  };
+  TcTextarea.prototype.getCursorColumnPosition = function () { return this.getColumnPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorPreviousGroupPosition = function () { return this.getPreviousGroupPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorNextGroupPosition = function () { return this.getNextGroupPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLineStartPosition = function () { return this.getLineStartPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLineEndPosition = function () { return this.getLineEndPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLineUpPosition = function () { return this.getLineUpPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLineDownPosition = function () { return this.getLineDownPosition(this.getCursorPosition()); };
 
   TcTextarea.prototype.setCursorPosition = function (position, select) {
     var textarea = this._textarea;
@@ -300,7 +361,7 @@ this.TcTextarea = (function script() {
         else textarea.setSelectionRange(position, textarea.selectionEnd, "backward");
       } else textarea.setSelectionRange(position, position);
     }
-  }
+  };
   TcTextarea.prototype.moveCursor = function (offset, select) {
     var textarea = this._textarea, tmp = 0;
     if (textarea.selectionDirection[0] === "f") {
