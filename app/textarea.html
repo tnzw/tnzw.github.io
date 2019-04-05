@@ -3,7 +3,7 @@
   <head>
     <meta charset=UTF-8>
     <!--
-      textarea.js Version 2.0.0
+      textarea.js Version 2.0.1
 
       Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -394,10 +394,16 @@
 
       CodeMirror.optionHandlers.xDocumentTitle = function (cm, val) { xDocumentTitle.textContent = val; };
       CodeMirror.optionHandlers.xEditMode = function (cm, val) { xEditMode.textContent = val; };
+      CodeMirror.optionHandlers.xColumnLimit = function (cm, val) {
+        val = parseInt(val, 10) || 80;
+        var s = "";
+        while (--val >= 0) s += "&nbsp;";
+        $("code")[0].innerHTML = s;
+      };
 
-      var scrollHeightReference = {scrollHeight: app.element.scrollHeight};
-      editor.fitStyleHeightToText(scrollHeightReference.scrollHeight);
-      editor.getTextArea().addEventListener("input", _ => editor.fitStyleHeightToText(scrollHeightReference.scrollHeight), {passive: true});
+      //var scrollHeightReference = {scrollHeight: app.element.scrollHeight};
+      //editor.fitStyleHeightToText(scrollHeightReference.scrollHeight);
+      //editor.getTextArea().addEventListener("input", _ => editor.fitStyleHeightToText(scrollHeightReference.scrollHeight), {passive: true});
 
       //editor.workaroundScroll = function () { if (editor.hasFocus()) { editor._textarea.blur(); editor.focus(); } };  // XXX generates change events
     </script>
