@@ -308,6 +308,7 @@
   CodeMirror.keyMap.tc["Alt--"] = "tcAutocompleteWord";
   CodeMirror.keyMap.tc["Alt-,"] = "goDocStart";
   CodeMirror.keyMap.tc["Alt-."] = "goDocEnd";
+  CodeMirror.keyMap.tc["Alt-;"] = "goDocEnd";
   CodeMirror.keyMap.tc["Alt-Up"] = "goPageUp"; // (NO OTHER CHOICE on chromebooks)
   CodeMirror.keyMap.tc["Alt-Down"] = "goPageDown"; // (NO OTHER CHOICE on chromebooks)
   CodeMirror.keyMap.tc["Alt-Space"] = "tcAutocompleteWord"; // (unreachable on Windows)

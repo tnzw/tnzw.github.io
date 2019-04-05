@@ -3,7 +3,7 @@
   <head>
     <meta charset=UTF-8>
     <!--
-      codemirror.html Version 1.8.0
+      codemirror.html Version 2.0.0
 
       Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -113,6 +113,7 @@
     <script src=../js/lib/tc-codemirror-keymap.js></script>
 
     <script src=../js/var/readBlob.js></script>
+    <script src=../js/var/parsePromptArguments.js></script>
     <script src=../js/var/CodeMirrorApp.js></script>
     <script src=../js/var/loadVarScripts.js></script>
 
@@ -187,7 +188,8 @@
       CodeMirror.commands.save.exporters = [];
       CodeMirror.commands.promptSetOption = function (cm) {
         var line = prompt("command...");
-        var args = line.replace(/^\s+/, "").split(/\s+/);
+        if (line === null) { return; }
+        var args = parsePromptArguments(line);
         if (args[1] === "true") args[1] = true;
         else if (args[1] === "false") args[1] = false;
         else if (args[1] === "null") args[1] = null;
@@ -217,6 +219,7 @@
       function cmd_opt(cm, cmdName, opt) { cm.setOption(cmdName, opt); }
       CodeMirror.commands.promptSetOption.commands = {
         "": cmd_opt,  // fallback
+        "title": function (cm, cmdName, title) { cm.setOption("xDocumentTitle", title); },
         "mode": function (cm, cmdName, opt) { var o = modeShortcuts[opt] || opt; cm.setOption(cmdName, o); },
         "open": function (cm) { CodeMirror.commands.open(cm); },
         "save": function (cm, cmdName, title) { CodeMirror.commands.save(cm, title); },
@@ -235,7 +238,7 @@
 
       CodeMirror.keyMap.default.F3 = "findNext";
       CodeMirror.keyMap.default["Shift-F3"] = "findPrev";
-      CodeMirror.keyMap.default["Alt-;"] = "promptSetOption";
+      CodeMirror.keyMap.default.F2 = "promptSetOption";
       CodeMirror.keyMap.default["Ctrl-O"] = "open";
 
       var app = new CodeMirrorApp({
@@ -256,7 +259,7 @@
         xEditMode: "text",
       });
       document.body.appendChild(app.element);
-      var editor = app.getCodeMirrorEditor();
+      var editor = app.editor;
       //editor.refresh();  // autoRefresh
       editor.focus();
       window.onbeforeunload = function () { return "No!"; };
@@ -347,7 +350,7 @@
           var k = "";
           CodeMirror.commands.promptSetOption.commands.pwd = function (cm) {
             var div = null, input = null, magic = null, origDisplay = "";
-            div = dce("div", {}, [
+            div = dce("div", {style: "padding:3em;"}, [
               dce("span", {}, ["Pass: "]),
               input = dce("input", {type: "password"}),
               magic = dce("span")

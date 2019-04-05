@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=UTF-8>
+    <!--
+      textarea.js Version 2.0.0
+
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
+      This program is free software. It comes without any warranty, to
+      the extent permitted by applicable law. You can redistribute it
+      and/or modify it under the terms of the Do What The Fuck You Want
+      To Public License, Version 2, as published by Sam Hocevar. See
+      http://www.wtfpl.net/ for more details.
+    -->
+    <title>TcTextarea</title>
+    <meta name=viewport content="width=device-width,user-scalable=yes,initial-scale=1">
+    <script src=../js/var/TcTextarea.js></script>
+    <script src=../js/var/parsePromptArguments.js></script>
+    <script src=../js/var/readBlob.js></script>
+    <script src=../js/var/TcTextareaApp.js></script>
+    <script src=../js/var/loadVarScripts.js></script>
+  </head>
+  <body style=margin:0;height:100vh;padding:8px;box-sizing:border-box;background-color:white>
+    <header style=position:fixed;float:right>
+      <div><button class=button-menu>...</button> <span><sup class=x-edit-mode>text</sup></span> <span class=span-document-title>untitled.txt</span></div>
+      <div class=menu-container style=display:none><button class=button-load>Load</button><button class=button-save>Save</button><button class=button-prompt>Prompt</button></div>
+    </header>
+    <code style=z-index:-1;padding:2px;position:fixed;height:100%;border-right-width:1px;border-right-style:dotted;font-size:inherit>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
+    <script>
+      function $(sel) { return Array.from(document.body.querySelectorAll(sel)); }
+      window.CodeMirror = TcTextarea;
+      window.CodeMirrorApp = TcTextareaApp;
+
+      var menuButton = document.querySelector(".button-menu");
+      var menuContainer = document.querySelector(".menu-container");
+
+      function indexOfParentElement(fromElement, searchElement) {
+        var element = fromElement, i = -1;
+        while (element) {
+          i = (i + 1)|0;
+          if (element === searchElement) return i|0;
+          element = element.parentElement;
+        }
+        return -1;
+      }
+
+      function closeMenu(event) {
+        menuContainer.style.display = "none";
+        document.body.removeEventListener("click", closeMenu.listener, {capture: true, passive: true});
+        document.body.removeEventListener("focus", closeMenu.listener, {capture: true, passive: true});
+      }
+      closeMenu.listener = function (event) {
+        if (event.target === menuButton || indexOfParentElement(event.target, menuContainer) > -1) {}
+        else closeMenu(event);
+      };
+
+      function openMenu(event) {
+        document.body.addEventListener("click", closeMenu.listener, {capture: true, passive: true});
+        document.body.addEventListener("focus", closeMenu.listener, {capture: true, passive: true});
+        menuContainer.style.display = "";
+      }
+
+      function toggleMenu(event) {
+        if (menuContainer.style.display === "none") openMenu(event);
+        else closeMenu(event);
+      }
+
+      menuButton.addEventListener("click", toggleMenu, {passive: true});
+
+      var xEditMode = document.querySelector(".x-edit-mode");
+      var xDocumentTitle = document.querySelector(".span-document-title");
+      var saveButton = document.querySelector(".button-save");
+      var loadButton = document.querySelector(".button-load");
+      var promptButton = document.querySelector(".button-prompt");
+
+      saveButton.addEventListener("click", function () { editor.focus(); CodeMirror.commands.save(editor); }, {passive: true});
+      loadButton.addEventListener("click", function () { editor.focus(); CodeMirror.commands.open(editor); }, {passive: true});
+      promptButton.addEventListener("click", function () { editor.focus(); CodeMirror.commands.promptSetOption(editor); }, {passive: true});
+    </script>
+    <script>
+      function ensureUint8Array(bytes) {
+        if (bytes instanceof Uint8Array) return bytes;
+        return new Uint8Array(bytes);
+      }
+
+      var editmode = function (cm) { return editmode[cm.getOption("xEditMode") || "text"]; };
+      editmode.text = {};
+      editmode.text.getBytes = null;
+      editmode.text.setBytes = null;
+      editmode.text.getText = function (cm) { return cm.getValue(); };
+      editmode.text.setText = function (cm, text) { cm.setValue(text); };
+
+      CodeMirror.commands.open = function (cm) {
+        var input = document.createElement("input");
+        input.tabIndex = "-1";
+        input.style.display = "none";
+        input.type = "file";
+        document.body.appendChild(input);
+        function listener() {
+          document.body.removeEventListener("click", listener);
+          document.body.removeChild(input);
+        }
+        document.body.addEventListener("click", listener);
+        input.addEventListener("change", function () {
+          CodeMirror.commands.open.reader(cm, input.files[0]);
+          cm.setOption("xDocumentTitle", input.files[0].name || "untitled.txt");
+        });
+        input.click();
+      };
+      CodeMirror.commands.open.reader = function (cm, blob) {
+        if (CodeMirror.commands.open.importers.length) {
+          return readBlob(blob, "arraybuffer").then(function (bytes) {
+            bytes = new Uint8Array(bytes);
+            CodeMirror.commands.open.importers.forEach(function (r) { bytes = ensureUint8Array(r(bytes)); });
+            editmode(cm).setBytes(cm, bytes);
+          });
+        }
+        if (editmode(cm) === editmode.text)
+          return readBlob(blob, "text").then(function (text) { editmode(cm).setText(cm, text); });
+        return readBlob(blob, "arraybuffer").then(function (bytes) { editmode(cm).setBytes(cm, new Uint8Array(bytes)); });
+      };
+      CodeMirror.commands.open.importers = [];
+      CodeMirror.commands.save = function (cm, title) {
+        var a = document.createElement("a"), data = CodeMirror.commands.save.reader(cm);
+        a.tabIndex = "-1";
+        a.href = URL.createObjectURL(new Blob([data]));
+        if (title) { cm.setOption("xDocumentTitle", title); }
+        a.download = cm.getOption("xDocumentTitle") || "untitled.txt";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { document.body.removeChild(a); });
+      };
+      CodeMirror.commands.save.reader = function (cm) {
+        var data = null;
+        if (CodeMirror.commands.save.exporters.length) {
+          data = editmode(cm).getBytes(cm);
+          CodeMirror.commands.save.exporters.forEach(function (r) { data = ensureUint8Array(r(data)); });
+          return data;
+        }
+        if (editmode(cm).getBytes)
+          return ensureUint8Array(editmode(cm).getBytes(cm));
+        return editmode(cm).getText(cm);
+      };
+      CodeMirror.commands.save.exporters = [];
+      CodeMirror.commands.promptSetOption = function (cm) {
+        var line = prompt("command...");
+        if (line === null) { return; }
+        var args = parsePromptArguments(line);
+        if (args[1] === "true") args[1] = true;
+        else if (args[1] === "false") args[1] = false;
+        else if (args[1] === "null") args[1] = null;
+        else if (/^[0-9]+$/.test(args[1])) args[1] = parseInt(args[1], 10);
+        var commands = CodeMirror.commands.promptSetOption.commands;
+        var method = commands[args[0]] || commands[""];
+        method(cm, args[0], args[1]);
+      };
+      CodeMirror.commands.eval = function (cm) {
+        switch (cm.getOption("mode")) {
+          case "javascript":
+            eval(editmode(cm).getText(cm));
+            break;
+          default:
+            console.error("Cannot eval in this mode.");
+            alert("Cannot eval in this mode.");
+        }
+      };
+      var modeShortcuts = {
+        c: "clike",
+        html: "htmlmixed",
+        js: "javascript",
+        md: "markdown",
+        py: "python",
+        sh: "shell"
+      };
+      function cmd_opt(cm, cmdName, opt) { cm.setOption(cmdName, opt); }
+      CodeMirror.commands.promptSetOption.commands = {
+        "": cmd_opt,  // fallback
+        "title": function (cm, cmdName, title) { cm.setOption("xDocumentTitle", title); },
+        "mode": function (cm, cmdName, opt) { var o = modeShortcuts[opt] || opt; cm.setOption(cmdName, o); },
+        "open": function (cm) { CodeMirror.commands.open(cm); },
+        "save": function (cm, cmdName, title) { CodeMirror.commands.save(cm, title); },
+        "eval": function (cm) { CodeMirror.commands.eval(cm); },
+        "help": function (cm) {
+          var help = "", d = CodeMirror.commands.promptSetOption.commands;
+          Object.keys(d).sort().forEach(function (k) {
+            var title = k, p = /\(([^\)]*)\)/.exec(CodeMirror.commands.promptSetOption.commands[k].toString())[1].split(/\s*,\s*/).slice(2).join(" ");
+            if (!k) title = "[setOption]";
+            if (p) help += title + " " + p + "\n";
+            else help += title + "\n";
+          });
+          alert(help);
+        }
+      };
+
+      CodeMirror.keyMap.default.F3 = "findNext";
+      CodeMirror.keyMap.default["Shift-F3"] = "findPrev";
+      CodeMirror.keyMap.default.F2 = "promptSetOption";
+      CodeMirror.keyMap.default["Ctrl-O"] = "open";
+
+      var app = new CodeMirrorApp({
+        autofocus: true,  // default false (does not really work)
+        autoRefresh: true,  // default false (autorefresh)
+        fullScreen: true,  // default false (fullscreen)
+        indentWithTabs: false,  // default false
+        keyMap: "tc",  // default "default" (tc-codemirror-keymap)
+        lineNumbers: true,  // default false
+        matchBrackets: true,  // default false (matchbrackets)
+        mode: "text",  // default "text"
+        readOnly: false,  // default false
+        showTrailingSpace: true,  // default false (trailingspace)
+        smartIndent: false,  // default true
+        tabSize: 2,  // default 4
+        theme: "default",  // default "default"
+        xDocumentTitle: "untitled.txt",
+        xEditMode: "text",
+      });
+      document.body.appendChild(app.element);
+      var editor = app.editor;
+      //editor.refresh();  // autoRefresh
+      editor.focus();
+      window.onbeforeunload = function () { return "No!"; };
+
+      loadVarScripts({baseUrl: "../js/var/"}, "createUtf8CodeArrayFromString", "createStringFromUtf8CodeArray").then(function () {
+
+        function createStringFromBytes(bytes) { return createStringFromUtf8CodeArray(bytes); }
+        function createBytesFromString(string) { return createUtf8CodeArrayFromString(string); }
+
+        editmode.text.getBytes = function (cm) { return createBytesFromString(cm.getValue()); };
+        editmode.text.setBytes = function (cm, bytes) { cm.setValue(createStringFromBytes(bytes)); };
+        CodeMirror.commands.promptSetOption.commands.astext = function (cm) { cm.setOption("xEditMode", "text"); };
+        CodeMirror.commands.promptSetOption.commands.totext = function (cm) {
+          if (editmode(cm) === editmode.text) return;
+          cm.setValue(createStringFromBytes(editmode(cm).getBytes(cm)));
+          cm.setOption("xEditMode", "text");
+        };
+
+      //});
+      //loadVarScripts({baseUrl: "../js/var/"}, "createUtf8CodeArrayFromString", "createStringFromUtf8CodeArray").then(function () {
+
+        function createReprFromBytes(bytes) {
+          var s = "", i = 0, byte = 0;
+          for (; i < bytes.length; i += 1) {
+            byte = bytes[i] & 0xFF;
+            if (byte === 0x0A) { s += "\n"; }
+            else if (byte === 0x09) { s += "\\t"; }
+            else if (byte === 0x0D) { s += "\\r"; }
+            else if (byte === 0x08) { s += "\\b"; }
+            else if (byte === 0x0C) { s += "\\f"; }
+            else if (byte === 0x0B) { s += "\\v"; }
+            //else if (byte === 0x22) { s += "\\\""; }
+            else if (byte === 0x5C) { s += "\\\\"; }
+            else if (byte < 0x10) { s += "\\x0" + byte.toString(16); }
+            else if (byte < 0x20 || byte >= 0x7F) { s += "\\x" + byte.toString(16); }
+            else { s += String.fromCharCode(byte); }
+          }
+          return s;
+        }
+        function createReprFromString(string) { return createReprFromBytes(createBytesFromString(string)); }
+        function createBinaryStringFromRepr(repr) {
+          return repr.replace(/[\x80-\uffff]+/g, function (m) {
+            return String.fromCharCode.apply(String, createBytesFromString(m));
+          }).replace(/\\([ntrbfv"\\])/g, function (m, g) {
+            switch (g) {
+              case "n": return "\n";
+              case "t": return "\t";
+              case "r": return "\r";
+              case "b": return "\b";
+              case "f": return "\f";
+              case "v": return "\v";
+              case "\"": return "\"";
+              case "\\": return "\\";
+            }
+            return m;
+          }).replace(/\\x([0-9A-Fa-f]{2})/g, function (m, x) {
+            return String.fromCharCode(parseInt(x, 16));
+          });
+        }
+        function createBytesFromBinaryString(binaryString) {
+          var bytes = new Array(binaryString.length), i = 0;
+          for (; i < binaryString.length; i += 1) bytes[i] = binaryString.charCodeAt(i) & 0xFF;
+          return bytes;
+        }
+        function createBytesFromRepr(repr) { return createBytesFromBinaryString(createBinaryStringFromRepr(repr)); }
+        function createStringFromRepr(repr) { return createStringFromBytes(createBytesFromRepr(repr)); }
+
+        editmode.repr = {};
+        editmode.repr.getBytes = function (cm) { return createBytesFromRepr(cm.getValue()); };
+        editmode.repr.setBytes = function (cm, bytes) { cm.setValue(createReprFromBytes(bytes)); };
+        editmode.repr.getText = function (cm) { return createStringFromRepr(cm.getValue()); };
+        editmode.repr.setText = function (cm, text) { cm.setValue(createReprFromString(text)); };
+        CodeMirror.commands.promptSetOption.commands.asrepr = function (cm) { cm.setOption("xEditMode", "repr"); };
+        CodeMirror.commands.promptSetOption.commands.torepr = function (cm) {
+          if (editmode(cm) === editmode.repr) return;
+          cm.setValue(createReprFromBytes(editmode(cm).getBytes(cm)));
+          cm.setOption("xEditMode", "repr");
+        };
+
+      //});
+      //loadVarScripts({baseUrl: "../js/var/"}, "createUtf8CodeArrayFromString", "createStringFromUtf8CodeArray").then(function () {
+
+        loadVarScripts({baseUrl: "../js/var/"},
+                       "dce",
+                       "createPasswordMagicEventListener",
+                       "opensslAes256CbcDecrypt",
+                       "opensslAes256CbcEncrypt").then(function () {
+          var k = "";
+          CodeMirror.commands.promptSetOption.commands.pwd = function (cm) {
+            var div = null, input = null, magic = null, origDisplay = "";
+            div = dce("div", {style: "padding:3em;"}, [
+              dce("span", {}, ["Pass: "]),
+              input = dce("input", {type: "password"}),
+              magic = dce("span")
+            ]);
+            createPasswordMagicEventListener.addEventListenerToInputElement(input, createPasswordMagicEventListener(function (value) { magic.textContent = value; }));
+            origDisplay = cm.getWrapperElement().style.display;
+            cm.getWrapperElement().style.display = "none";
+            input.addEventListener("keyup", function (event) {
+              if (event.key !== "Enter") return;
+              k = input.value;
+              div.remove();
+              cm.getWrapperElement().style.display = origDisplay;
+              cm.focus();
+            }, {passive: true});
+            document.body.appendChild(div);
+            input.focus();
+          };
+          CodeMirror.commands.open.importers.push(function (bytes) {
+            if (k) return opensslAes256CbcDecrypt(bytes, k);
+            return bytes;
+          });
+          CodeMirror.commands.save.exporters.push(function (bytes) {
+            if (k) return opensslAes256CbcEncrypt(bytes, k);
+            return bytes;
+          });
+        });
+
+      });
+
+      function dumpBytesToHexadecimal(bytes) {
+        // 63 6f 75 63 6f 75 63 6f  75 63 6f 75 63 6f 75 63  |coucoucoucoucouc| 00000000
+        // 6f 75                                             |ou|               00000010
+        var res = "", memi = 0, bi = 0, ai = 0, l = bytes.length;
+        for (memi = 0; memi < l; memi += 0x10) {
+          res += ("0" + bytes[bi++].toString(16)).slice(-2) + " ";
+          while (bi < l && bi % 0x08) res += ("0" + bytes[bi++].toString(16)).slice(-2) + " ";
+          res += " ";
+          while (bi < l && bi % 0x10) res += ("0" + bytes[bi++].toString(16)).slice(-2) + " ";
+          if (bi % 0x10) res += "   ".repeat(0x10 - (bi % 0x10)) + " |";
+          else res += " |";
+          do {
+            if (bytes[ai] >= 32 && bytes[ai] <= 126) res += String.fromCharCode(bytes[ai]);
+            else res += ".";
+            ai += 1;
+          } while (ai < l && ai % 0x10);
+          res += "|";
+          if (ai % 0x10) { do { res += " " } while (ai++ % 0x10); }
+          else res += " ";
+          res += ("0000000" + memi.toString(16)).slice(-8) + "\n";
+        }
+        //res += ("0000000" + bytes.length.toString(16)).slice(-8);
+        return res;
+      }
+      function decodeHexadecimalWithCommentsToBytes(text) {
+        text = text.replace(/\|.*/gm, "").replace(/\s/g, "")  // ignore comments and whitespaces
+        if (/[^a-fA-F0-9]/.test(text)) throw new Error("invalid character");
+        if (text.length % 2) throw new Error("text.length % 2 !== 0");
+        var i = 0, j = 0,
+            bytes = new Array(text.length / 2);
+        for (; i < text.length; i += 2)
+          bytes[j++] = parseInt(text.slice(i, i + 2), 16);
+        return bytes;
+      }
+
+      editmode.hex = {};
+      editmode.hex.getBytes = function (cm) { return decodeHexadecimalWithCommentsToBytes(cm.getValue()); };
+      editmode.hex.setBytes = function (cm, bytes) { cm.setValue(dumpBytesToHexadecimal(bytes)); };
+      editmode.hex.getText = null;
+      editmode.hex.setText = null;
+      CodeMirror.commands.promptSetOption.commands.ashex = function (cm) { cm.setOption("xEditMode", "hex"); };
+      CodeMirror.commands.promptSetOption.commands.tohex = function (cm) {
+        if (cm.getOption("xEditMode") === "hex") return;
+        cm.setValue(dumpBytesToHexadecimal(editmode(cm).getBytes(cm)));
+        cm.setOption("xEditMode", "hex");
+      };
+    </script>
+    <script>
+      // Interface workarounds
+
+      editor.getTextArea().style = "style=padding:2px;padding-top:3em;border:none;margin:0;width:100%;height:100%;box-sizing:border-box;resize:none;background-color:rgba(255,255,255,0);font-size:inherit";
+      editor.getTextArea().setAttribute("autocorrect", "off");
+      editor.getTextArea().setAttribute("autocapitalize", "off");
+      editor.getTextArea().setAttribute("spellcheck", "false");
+
+      CodeMirror.optionHandlers.xDocumentTitle = function (cm, val) { xDocumentTitle.textContent = val; };
+      CodeMirror.optionHandlers.xEditMode = function (cm, val) { xEditMode.textContent = val; };
+
+      var scrollHeightReference = {scrollHeight: app.element.scrollHeight};
+      editor.fitStyleHeightToText(scrollHeightReference.scrollHeight);
+      editor.getTextArea().addEventListener("input", _ => editor.fitStyleHeightToText(scrollHeightReference.scrollHeight), {passive: true});
+
+      //editor.workaroundScroll = function () { if (editor.hasFocus()) { editor._textarea.blur(); editor.focus(); } };  // XXX generates change events
+    </script>
+  </body>
+</html>
