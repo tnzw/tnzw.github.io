@@ -3,7 +3,7 @@
   <head>
     <meta charset=UTF-8>
     <!--
-      textarea.js Version 2.0.1
+      textarea.js Version 2.0.2
 
       Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -306,22 +306,27 @@
                        "opensslAes256CbcEncrypt").then(function () {
           var k = "";
           CodeMirror.commands.promptSetOption.commands.pwd = function (cm) {
-            var div = null, input = null, magic = null, origDisplay = "";
+            var div = null, input = null, ok = null, magic = null, origDisplay = "";
             div = dce("div", {style: "padding:3em;"}, [
               dce("span", {}, ["Pass: "]),
               input = dce("input", {type: "password"}),
+              ok = dce("button", {}, ["OK"]),
               magic = dce("span")
             ]);
             createPasswordMagicEventListener.addEventListenerToInputElement(input, createPasswordMagicEventListener(function (value) { magic.textContent = value; }));
             origDisplay = cm.getWrapperElement().style.display;
             cm.getWrapperElement().style.display = "none";
-            input.addEventListener("keyup", function (event) {
-              if (event.key !== "Enter") return;
+            function submit() {
               k = input.value;
               div.remove();
               cm.getWrapperElement().style.display = origDisplay;
               cm.focus();
+            }
+            input.addEventListener("keyup", function (event) {
+              if (event.key !== "Enter") return;
+              submit();
             }, {passive: true});
+            ok.addEventListener("click", submit, {passive: true});
             document.body.appendChild(div);
             input.focus();
           };
