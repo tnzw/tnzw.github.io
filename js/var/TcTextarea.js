@@ -1,7 +1,7 @@
 this.TcTextarea = (function script() {
   "use strict";
 
-  /*! TcTextarea.js Version 1.0.1
+  /*! TcTextarea.js Version 1.1.2
 
       Copyright (c) 2016-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -213,7 +213,9 @@ this.TcTextarea = (function script() {
     document.execCommand("insertText", false, replacement);
     textarea.setSelectionRange(cstart, cend, dir);
   };
-  TcTextarea.prototype.setRangeText = /Firefox\//.test(navigator.userAgent) ? TcTextarea.prototype._setRangeTextNative : TcTextarea.prototype._setRangeTextWithExecCommand;
+  TcTextarea.prototype.setRangeText = (typeof navigator !== "undefined" && /Firefox\//.test(navigator.userAgent)) ?
+    TcTextarea.prototype._setRangeTextNative :
+    TcTextarea.prototype._setRangeTextWithExecCommand;
   TcTextarea.prototype.setSelectionRange = function (start, end, direction) {
     this._textarea.setSelectionRange(start, end, direction);
   };
@@ -323,30 +325,52 @@ this.TcTextarea = (function script() {
     var end = this._textarea.value.indexOf("\n", pos);
     return end === -1 ? this._textarea.value.length : end;
   };
-  TcTextarea.prototype.getLineUpPosition = function (pos) {
+  TcTextarea.prototype.getLineUpPosition = function (pos, colpos) {
     pos = pos|0;
-    var start = this._textarea.value.lastIndexOf("\n", pos - 1);
+    colpos = colpos|0;
+    var upstart = 0,
+        start = this._textarea.value.lastIndexOf("\n", pos - 1),
+        distance = pos - start;
     if (start === -1) { return 0; }
-    return Math.min(this._textarea.value.lastIndexOf("\n", start - 1) + pos - start, start);
+    upstart = this._textarea.value.lastIndexOf("\n", start - 1);
+    if (colpos >= distance) {
+      return Math.min(upstart + colpos + 1, start);
+    }
+    return Math.min(upstart + distance, start);
   };
-  TcTextarea.prototype.getLineDownPosition = function (pos) {
+  TcTextarea.prototype.getLineDownPosition = function (pos, colpos) {
     pos = pos|0;
+    colpos = colpos|0;
     var start = 0,
         downend = 0,
+        distance = 0,
         end = this._textarea.value.indexOf("\n", pos);
     if (end === -1) { return this._textarea.value.length; }
     start = this._textarea.value.lastIndexOf("\n", pos - 1);
+    distance = pos - start;
     downend = this._textarea.value.indexOf("\n", end + 1);
-    if (downend === -1) { return end + pos - start; }
-    return Math.min(downend, end + pos - start);
+    if (downend === -1) { downend = this._textarea.value.length; }
+    if (colpos >= distance) {
+      return Math.min(downend, end + colpos + 1);
+    }
+    return Math.min(downend, end + distance);
+  };
+  TcTextarea.prototype.getLineRange = function (pos) {
+    pos = pos|0;
+    var start = this._textarea.value.lastIndexOf("\n", pos - 1) + 1,
+        end = this._textarea.value.indexOf("\n", pos);
+    if (end === -1) { return {start: start|0, end: this._textarea.value.length|0}; }
+    return {start: start|0, end: end|0};
   };
   TcTextarea.prototype.getCursorColumnPosition = function () { return this.getColumnPosition(this.getCursorPosition()); };
   TcTextarea.prototype.getCursorPreviousGroupPosition = function () { return this.getPreviousGroupPosition(this.getCursorPosition()); };
   TcTextarea.prototype.getCursorNextGroupPosition = function () { return this.getNextGroupPosition(this.getCursorPosition()); };
   TcTextarea.prototype.getCursorLineStartPosition = function () { return this.getLineStartPosition(this.getCursorPosition()); };
   TcTextarea.prototype.getCursorLineEndPosition = function () { return this.getLineEndPosition(this.getCursorPosition()); };
-  TcTextarea.prototype.getCursorLineUpPosition = function () { return this.getLineUpPosition(this.getCursorPosition()); };
-  TcTextarea.prototype.getCursorLineDownPosition = function () { return this.getLineDownPosition(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLineUpPosition = function (colpos) { return this.getLineUpPosition(this.getCursorPosition(), colpos); };
+  TcTextarea.prototype.getCursorLineDownPosition = function (colpos) { return this.getLineDownPosition(this.getCursorPosition(), colpos); };
+  TcTextarea.prototype.getCursorLineRange = function () { return this.getLineRange(this.getCursorPosition()); };
+  TcTextarea.prototype.getCursorLine = function () { var range = this.getCursorLineRange(); return this._textarea.value.slice(range.start, range.end); };
 
   TcTextarea.prototype.setCursorPosition = function (position, select) {
     var textarea = this._textarea;
@@ -581,20 +605,28 @@ this.TcTextarea = (function script() {
     tt.workaroundScroll();
   };
   TcTextarea.commands.goLineDown = function (tt) {
-    var event = tt.handledEvent, t = tt._textarea;
+    var event = tt.handledEvent, t = tt._textarea, colpos = 0, length = 0;
     if (!event.shiftKey && t.selectionStart !== t.selectionEnd) {
       t.setSelectionRange(t.selectionEnd, t.selectionEnd);
     } else {
-      tt.setCursorPosition(tt.getCursorLineDownPosition(), event.shiftKey);
+      colpos = tt.getCursorColumnPosition();
+      length = tt.getCursorLine().length;
+      if (colpos < length) { tt._commandGoLineState = colpos; }
+      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; } 
+      tt.setCursorPosition(tt.getCursorLineDownPosition(tt._commandGoLineState), event.shiftKey);
     }
     tt.workaroundScroll();
   };
   TcTextarea.commands.goLineUp = function (tt) {
-    var event = tt.handledEvent, t = tt._textarea;
+    var event = tt.handledEvent, t = tt._textarea, colpos = 0, length = 0;
     if (!event.shiftKey && t.selectionStart !== t.selectionEnd) {
       t.setSelectionRange(t.selectionStart, t.selectionStart);
     } else {
-      tt.setCursorPosition(tt.getCursorLineUpPosition(t), event.shiftKey);
+      colpos = tt.getCursorColumnPosition();
+      length = tt.getCursorLine().length;
+      if (colpos < length) { tt._commandGoLineState = colpos; }
+      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; } 
+      tt.setCursorPosition(tt.getCursorLineUpPosition(tt._commandGoLineState), event.shiftKey);
     }
     tt.workaroundScroll();
   };

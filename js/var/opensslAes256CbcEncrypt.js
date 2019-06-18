@@ -1,9 +1,9 @@
 this.opensslAes256CbcEncrypt = (function script() {
   "use strict";
 
-  /*! opensslAes256CbcEncrypt.js Version 1.0.3
+  /*! opensslAes256CbcEncrypt.js Version 1.1.0
 
-      Copyright (c) 2017-2018 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -42,8 +42,8 @@ this.opensslAes256CbcEncrypt = (function script() {
         key = new Array(32), iv = new Array(16),
         salt = desiredSalt === undefined ? crypto.getRandomValues(new Uint8Array(8)) : desiredSalt;
     //    salt = [0,0,0,0,0,0,0,0].map(_=>Math.floor(Math.random() * 0xFF));
-    if (typeof message === "string") message = encodeStringToUtf8(message);
-    if (typeof password === "string") password = encodeStringToUtf8(password);
+    if (typeof message === "string") message = new TextEncoder().encode(message);
+    if (typeof password === "string") password = new TextEncoder().encode(password);
     //OPENSSL_EVP_BytesToKey(sumBytesToSha256Bytes, 32, salt, password, 1, key, 32, iv, 16);
     OPENSSL_EVP_BytesToKey(sumBytesToMd5Bytes, 16, salt, password, 1, key, 32, iv, 16);
     message = aesCbcPkcs7EncryptBytes(message, encode32BytesTo8Int32(key), encode16BytesTo4Int32(desiredIv === undefined ? iv : desiredIv));
@@ -58,7 +58,7 @@ this.opensslAes256CbcEncrypt = (function script() {
   }
   opensslAes256CbcEncrypt.toScript = function () { return "(" + script.toString() + "())"; };
   opensslAes256CbcEncrypt._requiredGlobals = [
-    "encodeStringToUtf8",
+    "TextEncoder",
     "OPENSSL_EVP_BytesToKey",
     "sumBytesToMd5Bytes",
     "aesCbcPkcs7EncryptBytes",

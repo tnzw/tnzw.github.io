@@ -1,7 +1,7 @@
 this.ArrayViews = (function script() {
   "use strict";
 
-  /*! ArrayViews.js Version 1.1.0
+  /*! ArrayViews.js Version 1.1.2
 
       Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -74,7 +74,7 @@ this.ArrayViews = (function script() {
 
       startvvi = targetvvi = ((this.views.length|0) - 1)|0;
       // OR targetvvi = ((this.views.length|0) - 1)|0;
-      l = vv[startvvi].viewLength|0; while (l < start) { start = (start - l)|0; l = vv[--startvii].viewLength|0; }
+      l = vv[startvvi].viewLength|0; while (l < start) { start = (start - l)|0; l = vv[--startvvi].viewLength|0; }
       // OR l = vv[0].viewLength|0; while (l < start ) { start  = (start  - l)|0; l = vv[++startvvi ].viewLength|0; }
       targetvl = vv[targetvvi].viewOffset|0;
       startvl  = vv[startvvi ].viewOffset|0;
@@ -119,16 +119,64 @@ this.ArrayViews = (function script() {
     // while (cont) { if (!callback.call(thisArg, v, i, this)) return false; v = valueAt.call(this, ++i); }
     // return true;
   };
-  // XXXXXXXXXXXXXXXXXXXXXXXXXX
   ArrayViews.prototype.fill = function (value, start, end) {
-    // arrayview.fill(value[, start = 0[, end = this.length])
+    // arrayviews.fill(value[, start = 0[, end = this.length])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/fill
-    XXX;
+    var views = this.views, newViews = [],
+        totalLength = this.length|0,
+        length = 0, vvi = 0, vvl = views.length|0,
+        v = null, vl = 0, delta = 0,
+        wi = 0, wl = 0;
+    start = start|0;
+    end = end === undefined ? totalLength|0 : end|0;
     value = this._cast(value);
-    XXX;
+
+    if (end >= totalLength) end = totalLength|0; else if (end <= ~totalLength) return this; else if (end < 0) end = (totalLength + end)|0;
+    if (start >= totalLength) return this; else if (start <= ~totalLength) start = 0; else if (start < 0) start = (totalLength + start)|0;
+    if (start >= end) return this;
+
+    // seek for first eligible view, fill view part, if last return
+    for (; vvi < vvl; vvi += 1) {
+      v = views[vvi];
+      vl = v.viewLength|0;
+      if (((length + vl)|0) > start) {
+        delta = (start - length)|0;
+        if (((length + vl)|0) >= end) {
+          wi = ((v.viewOffset|0) + delta)|0;
+          wl = (wi + (end - length - delta)|0)|0;
+          for (; wi < wl; wi = (wi + 1)|0) v.array[wi] = value;
+          vvl = 0;  // exit all loops
+          break;
+        }
+        wi = ((v.viewOffset|0) + delta)|0;
+        wl = (wi + (((v.viewLength|0) - delta)|0))|0;
+        for (; wi < wl; wi = (wi + 1)|0) v.array[wi] = value;
+        length = (length + vl)|0;
+        vvi += 1;
+        break;
+      } else {
+        length = (length + vl)|0;
+      }
+    }
+    // fill full views and last view part
+    for (; vvi < vvl; vvi += 1) {
+      v = views[vvi];
+      vl = v.viewLength|0;
+      if (((length + vl)|0) >= end) {
+        wi = v.viewOffset|0;
+        wl = (wi + ((end - length)|0))|0;
+        for (; wi < wl; wi = (wi + 1)|0) v.array[wi] = value;
+        break;
+      } else {
+        wi = v.viewOffset|0;
+        wl = (wi + (v.viewLength|0))|0;
+        for (; wi < wl; wi = (wi + 1)|0) v.array[wi] = value;
+      }
+    }
+    return this;
   };
   ArrayViews.prototype.filter = function (callback, thisArg) {
-    // arrayview.filter(callback[, thisArg])
+    // arrayviews.filter(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/filter
     // knowing that `filter` can modify the current Views what strategy to use ?
     // use double loop ? use iterator ? use `valueAt` ? use something else ?
@@ -153,7 +201,7 @@ this.ArrayViews = (function script() {
     // return new this.constructor([{array: a, viewOffset: 0, viewLength: a.length}]);
   };
   ArrayViews.prototype.find = function (callback, thisArg) {
-    // arrayview.find(callback[, thisArg])
+    // arrayviews.find(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/find
     // knowing that `find` can modify the current Views what strategy to use ?
     // use double loop ? use iterator ? use `valueAt` ? use something else ?
@@ -166,20 +214,20 @@ this.ArrayViews = (function script() {
     return undefined;
   };
   ArrayViews.prototype.findIndex = function (callback, thisArg) {
-    // arrayview.findIndex(callback[, thisArg])
+    // arrayviews.findIndex(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/findIndex
     // knowing that `findIndex` can modify the current Views what strategy to use ?
     // use double loop ? use iterator ? use `valueAt` ? use something else ?
     // Here, we use a double loop version. It is ok if we assume that we don't edit the views object during the iteration.
     var vvi = 0, vvl = this.views.length|0, v = null, vi = 0, i = 0;
     for (; vvi < vvl; vvi += 1)
-      for (v = this.views[vvi], vi = 0; vi < (v.viewLength|0); vi += 1)
-        if (callback.call(thisArg, v.array[(vi + (v.viewOffset|0))|0], i++, this))
+      for (v = this.views[vvi], vi = 0; vi < (v.viewLength|0); vi += 1, i += 1)
+        if (callback.call(thisArg, v.array[(vi + (v.viewOffset|0))|0], i, this))
           return i|0;
     return -1;
   };
   ArrayViews.prototype.forEach = function (callback, thisArg) {
-    // arrayview.forEach(callback[, thisArg])
+    // arrayviews.forEach(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/forEach
     // knowing that forEach can modify the current Views what strategy to use ?
     // use double loop ? use iterator ? use `valueAt` ? use something else ?
@@ -203,17 +251,71 @@ this.ArrayViews = (function script() {
     // return undefined;
   };
   ArrayViews.prototype.includes = function (searchElement, fromIndex) {
-    // arrayview.includes(searchElement[, fromIndex])
+    // arrayviews.includes(searchElement[, fromIndex])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/includes
-    XXX;
+    var totalLength = this.length|0,
+        vv = this.views, vvi = 0, vvl = vv.length|0,
+        v = null, vi = 0, va = null, vl = 0,
+        l = 0;
+
+    fromIndex = fromIndex|0;
+    if (fromIndex >= totalLength) return false; else if (fromIndex <= ~totalLength) fromIndex = 0; else if (fromIndex < 0) fromIndex = (totalLength + fromIndex)|0;
+
+    v = vv[vvi];
+    l = v.viewLength|0; while (l < fromIndex) { fromIndex = (fromIndex - l)|0; v = vv[++vvi]; l = v.viewLength|0; }
+
+    va = v.array;
+    vi = v.viewOffset|0;
+    vl = (vi + (v.viewLength|0))|0;
+    vi = (vi + fromIndex)|0;
+
+    // Documentation does not tell to use array iterator.
+    // Anyway, iterator does not work with sparse array.
+    for (; vi < vl; vi += 1)
+      if (va[vi] === searchElement)
+        return true;
+
+    for (vvi += 1; vvi < vvl; vvi += 1)
+      for (v = vv[vvi], vi = v.viewOffset|0, va = v.array, vl = (vi + (v.viewLength|0))|0; vi < vl; vi += 1)
+        if (va[vi] === searchElement)
+          return true;
+
+    return false;
   };
   ArrayViews.prototype.indexOf = function (searchElement, fromIndex) {
-    // arrayview.includes(searchElement[, fromIndex = 0])
+    // arrayviews.indexOf(searchElement[, fromIndex = 0])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/indexOf
-    XXX;
+    var totalLength = this.length|0,
+        vv = this.views, vvi = 0, vvl = vv.length|0,
+        v = null, vi = 0, va = null, vl = 0,
+        l = 0;
+
+    fromIndex = fromIndex|0;
+    if (fromIndex >= totalLength) return -1; else if (fromIndex <= ~totalLength) fromIndex = 0; else if (fromIndex < 0) fromIndex = (totalLength + fromIndex)|0;
+
+    v = vv[vvi];
+    l = v.viewLength|0; while (l < fromIndex) { fromIndex = (fromIndex - l)|0; v = vv[++vvi]; l = v.viewLength|0; }
+
+    va = v.array;
+    vi = v.viewOffset|0;
+    vl = (vi + (v.viewLength|0))|0;
+    vi = (vi + fromIndex)|0;
+
+    // Documentation does not tell to use array iterator.
+    // Anyway, iterator does not work with sparse array.
+    for (; vi < vl; vi += 1, fromIndex += 1)
+      if (va[vi] === searchElement)
+        return fromIndex|0;
+
+    for (vvi += 1; vvi < vvl; vvi += 1)
+      for (v = vv[vvi], vi = v.viewOffset|0, va = v.array, vl = (vi + (v.viewLength|0))|0; vi < vl; vi += 1, fromIndex += 1)
+        if (va[vi] === searchElement)
+          return fromIndex|0;
+
+    return -1;
   };
   ArrayViews.prototype.join = function (separator) {
-    // arrayview.join([separator = ','])
+    // arrayviews.join([separator = ','])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/join
     var vvi = 0, vvl = this.views.length|0,
         v = null, vi = 0, vl = 0, va = null, s = "";
@@ -238,24 +340,82 @@ this.ArrayViews = (function script() {
     return s;
   };
   ArrayViews.prototype.lastIndexOf = function (searchElement, fromIndex) {
-    // arrayview.includes(searchElement[, fromIndex = this.viewLength])
+    // arrayviews.lastIndexOf(searchElement[, fromIndex = this.length])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/lastIndexOf
-    XXX;
+    var totalLength = this.length|0,
+        vv = this.views, vvi = 0, vvl = vv.length|0,
+        v = null, vi = 0, va = null, vl = 0,
+        l = 0;
+
+    fromIndex = fromIndex === undefined ? totalLength : fromIndex|0;
+    if (fromIndex >= totalLength) fromIndex = totalLength|0; else if (fromIndex <= ~totalLength) return -1; else if (fromIndex < 0) fromIndex = (totalLength + fromIndex)|0;
+
+    v = vv[vvi];
+    l = v.viewLength|0; while (l < fromIndex) { fromIndex = (fromIndex - l)|0; v = vv[++vvi]; l = v.viewLength|0; }
+
+    va = v.array;
+    vi = v.viewOffset|0;
+    vl = (vi + fromIndex)|0;
+
+    // Documentation does not tell to use array iterator.
+    // Anyway, iterator does not work with sparse array.
+    for (; vi < vl; fromIndex -= 1)
+      if (va[--vl] === searchElement)
+        return (fromIndex - 1)|0;
+
+    for (vvi -= 1; vvi >= 0; vvi -= 1)
+      for (v = vv[vvi], vi = v.viewOffset|0, va = v.array, vl = (vi + (v.viewLength|0))|0; vi < vl; fromIndex -= 1)
+        if (va[--vl] === searchElement)
+          return (fromIndex - 1)|0;
+
+    return -1;
   };
   ArrayViews.prototype.map = function (callback, thisArg) {
     // arrayviews.map(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/map
     return this.slice().remap(callback, thisArg);
   };
-  ArrayViews.prototype.reduce = function (callback, thisArg) {
-    // arrayviews.reduce(callback[, thisArg])
+  ArrayViews.prototype.reduce = function (callback, initialValue) {
+    // arrayviews.reduce(callback[, initialValue])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/reduce
-    XXX;
+    // knowing that reduce can modify the current Views what strategy to use ?
+    // use double loop ? use iterator ? use `valueAt` ? use something else ?
+    // Here, we use a double loop version. It is ok if we assume that we don't edit the views object during the iteration.
+    var vvi = 0, vvl = this.views.length|0, v = null, vi = 0, i = 0;
+    if (arguments.length < 2) {
+      if ((this.length|0) <= 0) throw new TypeError("reduce of empty array with no initial value");
+      for (; vvi < vvl; vvi += 1)
+        for (v = this.views[vvi], vi = 0; vi < (v.viewLength|0); vi += 1)
+          { initialValue = v.array[(vi + (v.viewOffset|0))|0]; i += 1; vvl = 0; vi += 1; break; }
+      vvl = this.views.length|0;
+      for (; vi < (v.viewLength|0); vi += 1)
+        initialValue = callback(initialValue, v.array[(vi + (v.viewOffset|0))|0], i++, this);
+    }
+    for (; vvi < vvl; vvi += 1)
+      for (v = this.views[vvi], vi = 0; vi < (v.viewLength|0); vi += 1)
+        initialValue = callback(initialValue, v.array[(vi + (v.viewOffset|0))|0], i++, this);
+    return initialValue;
   };
-  ArrayViews.prototype.reduceRight = function (callback, thisArg) {
-    // arrayviews.reduceRight(callback[, thisArg])
+  ArrayViews.prototype.reduceRight = function (callback, initialValue) {
+    // arrayviews.reduceRight(callback[, initialValue])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/reduceRight
-    XXX;
+    // knowing that reduceRight can modify the current Views what strategy to use ?
+    // use double loop ? use iterator ? use `valueAt` ? use something else ?
+    // Here, we use a double loop version. It is ok if we assume that we don't edit the views object during the iteration.
+    var vvi = 0, vvl = this.views.length|0, v = null, vi = 0, i = this.length|0;
+    if (arguments.length < 2) {
+      if ((this.length|0) <= 0) throw new TypeError("reduce of empty array with no initial value");
+      for (; vvi < vvl;)
+        for (v = this.views[--vvl], vi = (v.viewLength|0); 0 < vi;)
+          { initialValue = v.array[(--vi + (v.viewOffset|0))|0]; i += 1; vvi = vvl|0; break; }
+      vvi = 0;
+      for (; 0 < vi;)
+        initialValue = callback(initialValue, v.array[(--vi + (v.viewOffset|0))|0], --i, this);
+    }
+    for (; vvi < vvl;)
+      for (v = this.views[--vvl], vi = (v.viewLength|0); 0 < vi;)
+        initialValue = callback(initialValue, v.array[(--vi + (v.viewOffset|0))|0], --i, this);
+    return initialValue;
   };
   ArrayViews.prototype.reverse = function () {
     // arrayviews.reverse()
@@ -312,7 +472,7 @@ this.ArrayViews = (function script() {
 
     for (vvi += 1; ai < al && vvi < vvl; vvi += 1)
       for (v = vv[vvi], vi = v.viewOffset|0, va = v.array, vl = (vi + (v.viewLength|0))|0; ai < al && vi < vl; ai += 1, vi += 1)
-        va[vi] = array[ai];
+        va[vi] = this._cast(array[ai]);
 
     return undefined;
   };
@@ -330,7 +490,7 @@ this.ArrayViews = (function script() {
     return new this.constructor([{array: a, viewOffset: 0, viewLength: a.length}]);
   };
   ArrayViews.prototype.some = function (callback, thisArg) {
-    // arrayview.some(callback[, thisArg])
+    // arrayviews.some(callback[, thisArg])
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/some
     // knowing that `some` can modify the current Views what strategy to use ?
     // use double loop ? use iterator ? use `valueAt` ? use something else ?
@@ -398,11 +558,37 @@ this.ArrayViews = (function script() {
       } else {
         //newViews.push(new ArrayView(v.array, v.viewOffset|0, v.viewLength|0));
         newViews.push({array: v.array, viewOffset: v.viewOffset|0, viewLength: v.viewLength|0});
+        length = (length + vl)|0;
       }
     }
     return new this.constructor(newViews);
   };
-  // XXX ArrayViews.prototype.toLocaleString = function () {
+  ArrayViews.prototype.toLocaleString = function (locales, options) {
+    // arrayviews.toLocaleString([locales[, options]])
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/toLocaleString
+    // Code is completely copied from the join method, except for the tostr function and the separator definition.
+    var vvi = 0, vvl = this.views.length|0,
+        v = null, vi = 0, vl = 0, va = null, s = "",
+        separator = ",";
+    function tostr(v) { if (v === null || v === undefined) return ""; if (typeof v.toLocaleString === "function") return v.toLocaleString(locales, options); return ""+v; }
+    for (; vvi < vvl; vvi += 1) {
+      v = this.views[vvi];
+      vl = v.viewLength|0;
+      if (vl > 0) {
+        va = v.array;
+        vi = v.viewOffset|0;
+        vl = (vl + vi)|0;
+        s = tostr(va[v.viewOffset|0]);
+        for (vi += 1; vi < vl; vi += 1)
+          s += separator + tostr(va[vi]);
+        break;
+      }
+    }
+    for (vvi += 1; vvi < vvl; vvi += 1)
+      for (v = this.views[vvi], va = v.array, vi = v.viewOffset|0, vl = (vi + (v.viewLength|0))|0; vi < vl; vi += 1)
+        s += separator + tostr(va[vi]);
+    return s;
+  };
   ArrayViews.prototype.toString = function () {
     // arrayviews.toString()
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray/toString
@@ -513,7 +699,7 @@ this.ArrayViews = (function script() {
     // Here, we use a modified version of `valueAt`.
     var index = this.index|0;
         vvi = 0, vv = this.views, vvl = vv.length|0, l = 0, v = null;
-    l = vv[0].viewLength|0; while (l <= index) { if (++vvi >= vvl) return {done: true, value: undefined}; index = (index - l)|0; l = vv[vvi].viewLength|0; } 
+    l = vv[0].viewLength|0; while (l <= index) { if (++vvi >= vvl) return {done: true, value: undefined}; index = (index - l)|0; l = vv[vvi].viewLength|0; }
     v = vv[vvi];
     return {done: false, value: [this.index++, v.array[((v.viewOffset|0) + index)|0]]};
   };
@@ -530,7 +716,7 @@ this.ArrayViews = (function script() {
     // Here, we use a modified version of `valueAt`.
     var index = this.index|0;
         vvi = 0, vv = this.views, vvl = vv.length|0, l = 0, v = null;
-    l = vv[0].viewLength|0; while (l <= index) { if (++vvi >= vvl) return {done: true, value: undefined}; index = (index - l)|0; l = vv[vvi].viewLength|0; } 
+    l = vv[0].viewLength|0; while (l <= index) { if (++vvi >= vvl) return {done: true, value: undefined}; index = (index - l)|0; l = vv[vvi].viewLength|0; }
     v = vv[vvi];
     return {done: false, value: v.array[((v.viewOffset|0) + (this.index++))|0]};
   };

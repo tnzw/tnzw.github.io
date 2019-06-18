@@ -1,9 +1,9 @@
-(function script(global) {
+this.encodeUint32ToLittleEndianBytes = (function script(global) {
   "use strict";
 
-  /*! encodeUint32ToLittleEndianBytes.js Version 0.1.0
+  /*! encodeUint32ToLittleEndianBytes.js Version 1.0.0
 
-      Copyright (c) 2017 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -19,7 +19,7 @@
       (i >>> 24)/* & 0xFF*/
     ];
   }
-  global.encodeUint32ToLittleEndianBytes = encodeUint32ToLittleEndianBytes;
+  encodeUint32ToLittleEndianBytes.toScript = function () { return "(" + script.toString() + "())"; };
+  return encodeUint32ToLittleEndianBytes;
 
-}(this));
-
+}());

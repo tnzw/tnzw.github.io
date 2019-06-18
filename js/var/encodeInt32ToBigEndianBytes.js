@@ -1,9 +1,9 @@
-(function script(global) {
+this.encodeInt32ToBigEndianBytes = (function script() {
   "use strict";
 
-  /*! encodeInt32ToBigEndianBytes.js Version 0.1.0
+  /*! encodeInt32ToBigEndianBytes.js Version 1.0.0
 
-      Copyright (c) 2017 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -19,6 +19,7 @@
       i & 0xFF
     ];
   }
-  global.encodeInt32ToBigEndianBytes = encodeInt32ToBigEndianBytes;
+  encodeInt32ToBigEndianBytes.toScript = function () { return "(" + script.toString() + "())"; };
+  return encodeInt32ToBigEndianBytes;
 
-}(this));
+}());

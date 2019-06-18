@@ -1,9 +1,9 @@
 this.opensslAes256CbcDecrypt = (function script() {
   "use strict";
 
-  /*! opensslAes256CbcDecrypt.js Version 1.0.1
+  /*! opensslAes256CbcDecrypt.js Version 1.1.0
 
-      Copyright (c) 2017-2018 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -39,9 +39,9 @@ this.opensslAes256CbcDecrypt = (function script() {
     }
 
     var key = new Array(32), iv = new Array(16), salt = null, n = 0, i = 1;
-    if (typeof password === "string") password = encodeStringToUtf8(password);
-    if (withSalt === undefined) { if(decodeUtf8ToString(ciphered.slice(0, 8)) === "Salted__") salt = ciphered.slice(8, 16); }
-    else if (withSalt) { if(decodeUtf8ToString(ciphered.slice(0, 8)) === "Salted__") salt = ciphered.slice(8, 16); else return null; }
+    if (typeof password === "string") password = new TextEncoder().encode(password);
+    if (withSalt === undefined) { if(new TextDecoder().decode(new Uint8Array(ciphered.slice(0, 8))) === "Salted__") salt = ciphered.slice(8, 16); }
+    else if (withSalt) { if(new TextDecoder().decode(new Uint8Array(ciphered.slice(0, 8))) === "Salted__") salt = ciphered.slice(8, 16); else return null; }
     //OPENSSL_EVP_BytesToKey(sumBytesToSha256Bytes, 32, salt, password, 1, key, 32, iv, 16);
     OPENSSL_EVP_BytesToKey(sumBytesToMd5Bytes, 16, salt, password, 1, key, 32, iv, 16);
     if (salt) return aesCbcPkcs7DecryptBytes(ciphered.slice(16), encode32BytesTo8Int32(key), encode16BytesTo4Int32(desiredIv === undefined ? iv : desiredIv));
@@ -49,8 +49,8 @@ this.opensslAes256CbcDecrypt = (function script() {
   }
   opensslAes256CbcDecrypt.toScript = function () { return "(" + script.toString() + "())"; };
   opensslAes256CbcDecrypt._requiredGlobals = [
-    "encodeStringToUtf8",
-    "decodeUtf8ToString",
+    "TextEncoder",
+    "TextDecoder",
     "OPENSSL_EVP_BytesToKey",
     "sumBytesToMd5Bytes",
     "aesCbcPkcs7DecryptBytes"

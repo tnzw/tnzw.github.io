@@ -3,7 +3,7 @@
   <head>
     <meta charset=UTF-8>
     <!--
-      textarea.js Version 2.0.2
+      textarea.js Version 2.2.1
 
       Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -22,7 +22,7 @@
   </head>
   <body style=margin:0;height:100vh;padding:8px;box-sizing:border-box;background-color:white>
     <header style=position:fixed;float:right>
-      <div><button class=button-menu>...</button> <span><sup class=x-edit-mode>text</sup></span> <span class=span-document-title>untitled.txt</span></div>
+      <div><button class=button-menu>...</button> <span><sup class=x-edit-mode>text</sup><sub class=x-pwd-mode></sub></span> <span class=span-document-title>untitled.txt</span></div>
       <div class=menu-container style=display:none><button class=button-load>Load</button><button class=button-save>Save</button><button class=button-prompt>Prompt</button></div>
     </header>
     <code style=z-index:-1;padding:2px;position:fixed;height:100%;border-right-width:1px;border-right-style:dotted;font-size:inherit>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
@@ -67,6 +67,7 @@
 
       menuButton.addEventListener("click", toggleMenu, {passive: true});
 
+      var xPwdMode = document.querySelector(".x-pwd-mode");
       var xEditMode = document.querySelector(".x-edit-mode");
       var xDocumentTitle = document.querySelector(".span-document-title");
       var saveButton = document.querySelector(".button-save");
@@ -91,10 +92,14 @@
       editmode.text.setText = function (cm, text) { cm.setValue(text); };
 
       CodeMirror.commands.open = function (cm) {
-        var input = document.createElement("input");
+        var input = document.createElement("input"), pathm = null;
         input.tabIndex = "-1";
         input.style.display = "none";
         input.type = "file";
+        if (typeof nw !== "undefined" && cm.getOption("xDocumentPath")) {
+          pathm = require("path");
+          input.setAttribute("nwworkingdir", pathm.dirname(cm.getOption("xDocumentPath")));
+        }
         document.body.appendChild(input);
         function listener() {
           document.body.removeEventListener("click", listener);
@@ -102,8 +107,13 @@
         }
         document.body.addEventListener("click", listener);
         input.addEventListener("change", function () {
+          var ext = "";
           CodeMirror.commands.open.reader(cm, input.files[0]);
+          if (typeof nw !== "undefined")
+            cm.setOption("xDocumentPath", input.files[0].path);
           cm.setOption("xDocumentTitle", input.files[0].name || "untitled.txt");
+          ext = input.files[0].name.slice(1).replace(/^.*\./, "");
+          cm.setOption("mode", modeShortcuts[ext] || ext);
         });
         input.click();
       };
@@ -121,7 +131,18 @@
       };
       CodeMirror.commands.open.importers = [];
       CodeMirror.commands.save = function (cm, title) {
-        var a = document.createElement("a"), data = CodeMirror.commands.save.reader(cm);
+        var a = null, fs = null, path = "", data = null;
+        if (typeof nw !== "undefined") {
+          fs = nw.require("fs");
+          path = cm.getOption("xDocumentPath");
+          data = CodeMirror.commands.save.reader(cm);
+          if (!path) { return CodeMirror.commands.saveas(cm); }
+          fs.writeFileSync(path, data);
+          alert("Saved");
+          return;
+        }
+        a = document.createElement("a");
+        data = CodeMirror.commands.save.reader(cm);
         a.tabIndex = "-1";
         a.href = URL.createObjectURL(new Blob([data]));
         if (title) { cm.setOption("xDocumentTitle", title); }
@@ -143,6 +164,32 @@
         return editmode(cm).getText(cm);
       };
       CodeMirror.commands.save.exporters = [];
+      CodeMirror.commands.saveas = function (cm) {
+        var input = null, title = "";
+        if (typeof nw !== "undefined") {
+          var input = document.createElement("input");
+          input.tabIndex = "-1";
+          input.style.display = "none";
+          input.type = "file";
+          input.setAttribute("nwsaveas", cm.getOption("xDocumentTitle") || "untitled.txt");
+          function listener() {
+            document.body.removeEventListener("click", listener);
+            document.body.removeChild(input);
+          }
+          document.body.addEventListener("click", listener);
+          input.addEventListener("change", function () {
+            cm.setOption("xDocumentPath", input.files[0].path);
+            cm.setOption("xDocumentTitle", input.files[0].name || "untitled.txt");
+            CodeMirror.commands.save(cm);
+          });
+          input.click();
+          return;
+        }
+        title = prompt("Save as:", cm.getOption("xDocumentTitle"));
+        if (!title) { return; }
+        cm.setOption("xDocumentTitle", title);
+        CodeMirror.commands.save(cm);
+      };
       CodeMirror.commands.promptSetOption = function (cm) {
         var line = prompt("command...");
         if (line === null) { return; }
@@ -197,6 +244,18 @@
       CodeMirror.keyMap.default["Shift-F3"] = "findPrev";
       CodeMirror.keyMap.default.F2 = "promptSetOption";
       CodeMirror.keyMap.default["Ctrl-O"] = "open";
+      CodeMirror.keyMap.default["Shift-Ctrl-S"] = "saveas";
+      CodeMirror.keyMap.default["Ctrl-Shift-S"] = "saveas";
+
+      function updateTitle(cm) {
+        var a = cm.getOption("xDocumentPath") || cm.getOption("xDocumentTitle") || "";
+        if (a) a += " - ";
+        document.title = a + "(" + (cm.getOption("xEditMode") || "text") + ") CodeMirror";
+      }
+
+      CodeMirror.optionHandlers.xEditMode = updateTitle;
+      if (typeof nw !== "undefined")
+        CodeMirror.optionHandlers.xDocumentPath = updateTitle;
 
       var app = new CodeMirrorApp({
         autofocus: true,  // default false (does not really work)
@@ -321,6 +380,7 @@
               div.remove();
               cm.getWrapperElement().style.display = origDisplay;
               cm.focus();
+              cm.setOption("xPwdMode", k ? true : false);
             }
             input.addEventListener("keyup", function (event) {
               if (event.key !== "Enter") return;
@@ -390,6 +450,33 @@
       };
     </script>
     <script>
+      if (typeof nw !== "undefined") {
+        CodeMirror.keyMap.default["Ctrl-N"] = function () {
+          nw.Window.open(location.href.replace(/[\?#].*$/, ""), {new_instance: true, focus: true});
+        };
+        CodeMirror.keyMap.default["Ctrl-W"] = function () {
+          if (typeof window.onbeforeunload === "function") {
+            try { if (!window.onbeforeunload() || !confirm("Leave app? Changes that you made may not be saved.")) { return; } }
+            catch (ignore) {}
+          }
+          nw.Window.get().close();
+        };
+        setTimeout(function (cm) {
+          var u = new URL(location.href), path = u.searchParams.get("path");
+          if (path) {
+            var fs = nw.require("fs"),
+                pathm = nw.require("path"),
+                basename = pathm.basename(path),
+                ext = basename.slice(1).replace(/^.*\./, "");
+            CodeMirror.commands.open.reader(cm, new Blob([Uint8Array.from(fs.readFileSync(path))]));
+            cm.setOption("xDocumentPath", path);
+            cm.setOption("xDocumentTitle", basename || "untitled.txt");
+            cm.setOption("mode", modeShortcuts[ext] || ext);
+          }
+        }, 1000, editor);
+      }
+    </script>
+    <script>
       // Interface workarounds
 
       editor.getTextArea().style = "style=padding:2px;padding-top:3em;border:none;margin:0;width:100%;height:100%;box-sizing:border-box;resize:none;background-color:rgba(255,255,255,0);font-size:inherit";
@@ -397,20 +484,27 @@
       editor.getTextArea().setAttribute("autocapitalize", "off");
       editor.getTextArea().setAttribute("spellcheck", "false");
 
-      CodeMirror.optionHandlers.xDocumentTitle = function (cm, val) { xDocumentTitle.textContent = val; };
-      CodeMirror.optionHandlers.xEditMode = function (cm, val) { xEditMode.textContent = val; };
+      CodeMirror.optionHandlers.xDocumentTitle = function (cm, val) { xDocumentTitle.textContent = val; updateTitle(cm); };
+      CodeMirror.optionHandlers.xEditMode = function (cm, val) { xEditMode.textContent = val; updateTitle(cm); };
       CodeMirror.optionHandlers.xColumnLimit = function (cm, val) {
         val = parseInt(val, 10) || 80;
         var s = "";
         while (--val >= 0) s += "&nbsp;";
         $("code")[0].innerHTML = s;
       };
+      CodeMirror.optionHandlers.xPwdMode = function (cm, val) { xPwdMode.textContent = val ? "\u{1F512}" : ""; };
 
       //var scrollHeightReference = {scrollHeight: app.element.scrollHeight};
       //editor.fitStyleHeightToText(scrollHeightReference.scrollHeight);
       //editor.getTextArea().addEventListener("input", _ => editor.fitStyleHeightToText(scrollHeightReference.scrollHeight), {passive: true});
 
-      //editor.workaroundScroll = function () { if (editor.hasFocus()) { editor._textarea.blur(); editor.focus(); } };  // XXX generates change events
+      editor.workaroundScroll = function () {
+        if (editor.workaroundScroll.timer) return;
+        editor.workaroundScroll.timer = setTimeout(function () {
+          editor.workaroundScroll.timer = null;
+          if (editor.hasFocus()) { editor._textarea.blur(); editor.focus(); }  // XXX generates change events
+        }, 250);
+      };
     </script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-Version 20190121
+Version 20190511
 
 
 vocabulary :
@@ -36,7 +36,9 @@ decoders (1 block at a time) :
 
 decodeXFromY(y)                        -> {result: x                    , error: string[, warnings: string, ...]}
 decodeXFromYArray(yArray, yi, yl)      -> {result: x       , length: int, error: string[, warnings: string, ...]}
-decodeXArrayFromYArray(yArray, yi, yl) -> {result: array<x>, length: int, error: string[, warnings: string, ...]}
+decodeXArrayFromYArray(yArray, yi, yl) -> {result: array<x>, length: int, error: string[, warnings: string, ...]}  // DEPRECATED please use "..Into" version
+decodeXFromYInto(y, xArray, xi, xl)                   -> {           written: int, error: string[, warnings: string, ...]}
+decodeXFromYArrayInto(yArray, yi, yl, xArray, xi, xl) -> {read: int, written: int, error: string[, warnings: string, ...]}
     func should decode one block
     func should not stop on any warning
     func should stop on any error
@@ -50,7 +52,9 @@ encoders (1 block at a time) :
 
 encodeXToY(x)                          -> {result: y                    , error: string[, warnings: string, ...]}
 encodeXArrayToY(xArray, xi, xl)        -> {result: y       , length: int, error: string[, warnings: string, ...]}
-encodeXArrayToYArray(xArray, xi, xl)   -> {result: array<y>, length: int, error: string[, warnings: string, ...]}
+encodeXArrayToYArray(xArray, xi, xl)   -> {result: array<y>, length: int, error: string[, warnings: string, ...]}  // DEPRECATED please use "..Into" version
+encodeXToYInto(x, yArray, yi, yl)                   -> {           written: int, error: string[, warnings: string, ...]}
+encodeXArrayToYInto(xArray, xi, xl, yArray, yi, yl) -> {read: int, written: int, error: string[, warnings: string, ...]}
 
   encodeCodePointToUtf8ByteArray
   encodeByteArrayToBase64ByteArray

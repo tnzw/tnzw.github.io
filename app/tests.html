@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=UTF-8>
+    <style>
+      body > .console-log,
+      body > .console-info,
+      body > .console-warn,
+      body > .console-error
+      { margin: 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+      body > .console-info { color: blue; }
+      body > .console-warn { color: darkorange; }
+      body > .console-error { color: red; }
+    </style>
+    <script>
+      (function () {
+        var c = {};
+        function append(e) {
+          document.body.appendChild(e);
+        }
+        function span(o) {
+          var span = document.createElement("span");
+          span.textContent = o;
+          return span;
+        }
+        function p(key, spans) {
+          var p = document.createElement("p");
+          p.className = "console-" + key;
+          spans.forEach(function (span) { p.appendChild(span); });
+          return p;
+        }
+        function wrap(key) {
+          c[key] = console[key];
+          console[key] = function () {
+            if (typeof c[key] === "function")
+              c[key].apply(console, arguments);
+            var i = 0, spans = [];
+            for (; i < arguments.length; i += 1)
+              spans.push(span(arguments[i]));
+            append(p(key, spans));
+          };
+        }
+        if (typeof console !== "undefined" && console) {
+          wrap("log");
+          wrap("info");
+          wrap("warn");
+          wrap("error");
+        }
+        window.addEventListener("error", function (e) {
+          append(p("error", [span("Uncaught: " + e.message)]));
+        }, {passive: true});
+      }());
+    </script>
+    <script src=../js/var/loadVarScripts.js></script>
+  </head>
+  <body>
+    <script>console.log("--- tests.html ---");</script>
+    <script>loadVarScripts({baseUrl: "../js/var/"}, "toScript", "importScriptsAsync").then(_=>console.log("toScript,importScriptsAsync loaded"));</script>
+    <script src=../js/tests/unicode.js></script>
+    <script src=../js/tests/md5.js></script>
+    <script src=../js/tests/base64.js></script>
+    <script src=../js/tests/openssl.js></script>
+    <script src=../js/tests/json.js></script>
+    <script src=../js/tests/RsvpQueue.js></script>
+    <script src=../js/tests/RsvpQueue.fromGeneratorFunction.js></script>
+    <script src=../js/tests/ChunkView.js></script>
+    <script src=../js/tests/ChunkViews.js></script>
+    <script src=../js/tests/arrayview.js></script>
+    <script src=../js/tests/tcblob.js></script>
+  </body>
+</html>

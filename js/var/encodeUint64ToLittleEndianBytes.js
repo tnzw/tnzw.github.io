@@ -1,9 +1,9 @@
-(function script(global) {
+this.encodeUint64ToLittleEndianBytes = (function script() {
   "use strict";
 
-  /*! encodeUint64ToLittleEndianBytes.js Version 0.1.0
+  /*! encodeUint64ToLittleEndianBytes.js Version 1.0.0
 
-      Copyright (c) 2017 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2017-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -24,7 +24,8 @@
       (i / 72057594037927936) & 0xFF  // 72057594037927936 = 2**56
     ];
   }
-  global.encodeUint64ToLittleEndianBytes = encodeUint64ToLittleEndianBytes;
 
-}(this));
+  encodeUint64ToLittleEndianBytes.toScript = function () { return "(" + script.toString() + "())"; };
+  return encodeUint64ToLittleEndianBytes;
 
+}());
