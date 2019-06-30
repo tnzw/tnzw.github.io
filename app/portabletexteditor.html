@@ -2,7 +2,7 @@
 <html><head>
   <meta charset="UTF-8">
 
-  <!-- portabletexteditor.html Version 1.0.0
+  <!-- portabletexteditor.html Version 1.0.1
        Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
        This program is free software. It comes without any warranty, to
        the extent permitted by applicable law. You can redistribute it
@@ -55,6 +55,7 @@ function formatOf(name) { return name.slice(1).replace(/[^\.]*\./g, ""); }
 function strSize(size) { var sizes = ["B", "KB", "MB", "GB", "PB"], i = 0, l = sizes.length - 1; while (i < l && size > 9999) { i += 1; size = (size / 1000)|0; } return size + sizes[i]; }
 function binaryStringToUint8Array(binarystring) { var i = binarystring.length, u = new Uint8Array(i); while (--i >= 0) u[i] = binarystring.charCodeAt(i); return u; }
 function* iterarrays(arrays) { for (let array of arrays) for (let v of array) yield v; }
+function newname(origName) { return origName.replace(/( |)\(([0-9]+)\)(\.[^\.]+)$/, (m, s, n, e) => `${s}${e}`); };
 
 // Encryption inpired by openssl aes-256-cbc.
 async function hash(data) { if (typeof data === "string") data = new TextEncoder().encode(data); return new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(data))); }
@@ -113,7 +114,8 @@ if (initialData) {
   document.body.innerHTML = "";
 }
 
-fileInput = dce("input", {type: "file", style: "display:none;"});
+//fileInput = dce("input", {type: "file", style: "display:none;"});
+fileInput = dce("input", {type: "file", tabindex: "-1", style: "position:fixed;opacity:0;"});
 document.body.appendChild(fileInput);
 document.body.appendChild(dce("div"));
 
@@ -178,7 +180,7 @@ pell.init({
       else { if (a) selectElementContents(a); pell.exec("unlink"); }
     }},
     /*"image",*/ {name: "image", icon: "📷", title: "Image", result: async function () {
-      var files = await fileInput.open(),
+      var files = await openInputFileDialog(fileInput),
           file = null, size = 0, part = null,
           href = "", name = "",
           img = null;
@@ -206,7 +208,7 @@ pell.init({
       updateHeaderSizeButton();
     }},
     /*"file",*/ {name: "file", icon: `<img src="${fileIconDataURL}"/>`, title: "File", result: async function () {
-      var files = await fileInput.open(),
+      var files = await openInputFileDialog(fileInput),
           file = null, size = 0, part = null,
           href = "data:application/octet-stream;base64,",
           a = null;
@@ -231,7 +233,7 @@ pell.init({
       updateHeaderSizeButton();
     }},
     {name: "load", icon: "L<sub>oad</sub>", title: "Load", result: async function () {
-      var files = await fileInput.open(), file, html;
+      var files = await openInputFileDialog(fileInput), file, html;
       if (!files.length) return;
       file = files[0];
       if (modified && !confirm("Load document? Changes that you made may not be saved.")) return;
@@ -289,24 +291,6 @@ pell.init({
     selected: 'pell-button-selected'
   }
 });
-
-fileInput.open = function () {
-  var input = this;
-  return new Promise(r => {
-    var timer = null;
-    function listener(e) {
-      r(input.files);
-      if (timer !== null) clearTimeout(timer); 
-      window.removeEventListener("focus", listener.delayed, {passive: true, once: true});
-      e.target.removeEventListener("change", listener, {passive: true, once: true});
-    }
-    listener.delayed = e => timer = setTimeout(_ => listener(e), 100);
-    this.addEventListener("change", listener, {passive: true, once: true});
-    window.addEventListener("focus", listener.delayed, {passive: true, once: true});
-    this.value = null;
-    this.click();
-  });
-};
 
 // Allow to click on some links
 document.body.addEventListener("click", function (event) {
@@ -650,7 +634,7 @@ this.OPENSSL_EVP_BytesToKey = (function script() {
   </script>
   <script>
 // Compiled with `varcompiler.html` with vars:
-// readBlob
+// readBlob,openInputFileDialog
 this.readBlob = (function script() {
   "use strict";
 
@@ -689,6 +673,49 @@ this.readBlob = (function script() {
   }
   readBlob.toScript = function () { return "(" + script.toString() + "())"; };
   return readBlob;
+
+}());
+this.openInputFileDialog = (function script() {
+  "use script";
+
+  /*! openInputFileDialog.js Version 1.0.0
+
+      Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
+      This program is free software. It comes without any warranty, to
+      the extent permitted by applicable law. You can redistribute it
+      and/or modify it under the terms of the Do What The Fuck You Want
+      To Public License, Version 2, as published by Sam Hocevar. See
+      http://www.wtfpl.net/ for more details. */
+
+  function openInputFileDialog(input) {
+    // input element should have type=file
+    // XXX Find a way to resolve with empty file list when user closes the dialog.
+    //     This uses `cancel` method internaly to avoid calling it twice on the same element.
+    var oncancel = function () {},
+        promise = new Promise(function (resolve, reject) {
+      oncancel = function () { reject(new Error("cancelled")); }
+      if (input.type !== "file") return reject(new Error("not a file input element"));
+
+      function listener(e) {
+        resolve(e.target.files);
+        e.target.removeEventListener("change", listener, {passive: true, once: true});
+      }
+      input.addEventListener("change", listener, {passive: true, once: true});
+      input.value = null;
+      input.click();
+    });
+    promise.cancel = oncancel;
+
+    if (input.type === "file") {
+      if (input._openInputFileDialog_promise)
+        try { input._openInputFileDialog_promise.cancel(); } catch (_) {}
+      input._openInputFileDialog_promise = promise;
+    }
+    return promise;
+  }
+
+  openInputFileDialog.toScript = function () { return "(" + script.toString() + "())"; };
+  return openInputFileDialog;
 
 }());
   </script>

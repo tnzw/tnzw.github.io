@@ -7,7 +7,7 @@
    mostly thank to the Alt button.
   */
 
-  /*! tc-codemirror-keymap.js Version 20190405
+  /*! tc-codemirror-keymap.js Version 20190630
 
       Copyright (c) 2015-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -290,7 +290,7 @@
     cm.execCommand("goLineEnd");
     cm.replaceSelection("\n");
   };
-  CodeMirror.keyMap.tc["Alt-P"] = doNothing; // TODO searchPrevious
+  CodeMirror.keyMap.tc["Alt-P"] = "tcAutocompleteWord";
   // CodeMirror.keyMap.tc["Alt-Q"] = undefined;
   CodeMirror.keyMap.tc["Alt-R"] = "replace";
   CodeMirror.keyMap.tc["Alt-S"] = "delWordBefore";
@@ -372,7 +372,7 @@
     cm.replaceSelection("\n");
     cm.execCommand("goCharLeft");
   };
-  // CodeMirror.keyMap.tc["Shift-Alt-P"] = undefined;
+  CodeMirror.keyMap.tc["Shift-Alt-P"] = "tcAutocompleteWordReverse";
   // CodeMirror.keyMap.tc["Shift-Alt-Q"] = undefined;
   CodeMirror.keyMap.tc["Shift-Alt-R"] = "replaceAll";
   CodeMirror.keyMap.tc["Shift-Alt-S"] = "delCharAfter";

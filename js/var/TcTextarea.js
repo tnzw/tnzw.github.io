@@ -1,7 +1,7 @@
 this.TcTextarea = (function script() {
   "use strict";
 
-  /*! TcTextarea.js Version 1.1.2
+  /*! TcTextarea.js Version 1.2.0
 
       Copyright (c) 2016-2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -32,7 +32,7 @@ this.TcTextarea = (function script() {
   TcTextarea.keyMap.default = {fallthrough: "basic"};
   TcTextarea.optionHandlers = {};
   TcTextarea.modes = {};
-  TcTextarea.version = "20190402";
+  TcTextarea.version = "20190630";
   TcTextarea.prototype.getWrapperElement = function () { return this._textarea; };
   TcTextarea.prototype.getTextArea = function () { return this._textarea; };
   TcTextarea.prototype.toTextArea = function () { return; };
@@ -1045,170 +1045,14 @@ this.TcTextarea = (function script() {
   TcTextarea.keyMap.tc["Alt-C"] = "reverseCase";
   TcTextarea.keyMap.tc["Alt-Shift-C"] = "toggleCase";
   TcTextarea.keyMap.tc["Alt-Space"] = "tcAutocompleteWord";
+  TcTextarea.keyMap.tc["Alt-P"] = "tcAutocompleteWord";
   TcTextarea.keyMap.tc["Alt-Shift-Space"] = "tcAutocompleteWordReverse";
+  TcTextarea.keyMap.tc["Alt-Shift-P"] = "tcAutocompleteWordReverse";
   //TcTextarea.keyMap.tc["Alt-#"] = "removeTrailingSpaces";
 
   TcTextarea.keyMap.tc["Alt-R"] = "repeatAction";
 
   TcTextarea.toScript = function () { return "(" + script.toString() + "())"; };
   return TcTextarea;
-
-  // useless //
-  /*
-  var keyCodeStr = {
-    8: "Backspace",
-    9: "Tab",
-    13: "Enter",
-    16: "Shift",
-    17: "Control",
-    18: "Alt",
-    19: "Pause",
-    20: "CapsLock",
-    27: "Escape",
-    32: "Space",
-    33: "PageUp",
-    34: "PageDown",
-    35: "End",
-    36: "Home",
-    37: "ArrowLeft",
-    38: "ArrowUp",
-    39: "ArrowRight",
-    40: "ArrowDown",
-    45: "Insert",
-    46: "Delete",
-    //48: "0",
-    //49: "1",
-    //50: "2",
-    //51: "3",
-    //52: "4",
-    //53: "5",
-    //54: "6",
-    //55: "7",
-    //56: "8",
-    //57: "9",
-    //65: "A",
-    //66: "B",
-    //67: "C",
-    //68: "D",
-    //69: "E",
-    //70: "F",
-    //71: "G",
-    //72: "H",
-    //73: "I",
-    //74: "J",
-    //75: "K",
-    //76: "L",
-    //77: "M",
-    //78: "N",
-    //79: "O",
-    //80: "P",
-    //81: "Q",
-    //82: "R",
-    //83: "S",
-    //84: "T",
-    //85: "U",
-    //86: "V",
-    //87: "W",
-    //88: "X",
-    //89: "Y",
-    //90: "Z",
-    91: "OS",
-    93: "ContextMenu",
-    112: "F1",
-    113: "F2",
-    114: "F3",
-    115: "F4",
-    116: "F5",
-    117: "F6",
-    118: "F7",
-    119: "F8",
-    120: "F9",
-    121: "F10",
-    122: "F11",
-    123: "F12",
-    124: "F13",
-    125: "F14",
-    126: "F15",
-    127: "F16",
-    176: "MediaTrackNext",
-    177: "MediaTrackPrevious",
-    178: "MediaStop",
-    179: "MediaPlayPause",
-    225: "AltGraph",
-  };
-  TcTextarea.keyNames = keyCodeStr;
-  // END useless
-
-  function parseSedS(string) {
-    // parseSedS("/hello/lol/g") -> [/hello/g, "lol"]
-    var res = /^\/((?:\\.|[^\\\/])*)\/((?:[^/]|\\\/)*)\/([gimyu]{0,5})$/.exec(string);  // this regexp does not handle flag errors!
-    if (res === null) return null;
-    try { return [new RegExp(res[1], res[3]), res[2].replace(/\\\//g, "/")]; } catch (ignore) {}  // only this part checks for flag errors.
-    return null;
-  }
-
-  function parseSearchS(string) {
-    // parseSearchS("/hello/g") -> /hello/g
-    var res = /^\/((?:\\.|[^\\\/])*)(?:\/([gimyu]{0,5}))?$/.exec(string);  // this regexp does not handle flag errors!
-    if (res === null) return null;
-    try { return new RegExp(res[1], res[2]); } catch (ignore) {}  // only this part checks for flag errors.
-    return null;
-  }
-
-  function selectTextInRange(textarea, regexp, start, end) {
-    var match = null;
-    start = start|0;
-    end = end|0;
-    if (start === end) end = textarea.value.length;
-    match = regexp.exec(textarea.value.slice(start, end));
-    if (match) {
-      textarea.setSelectionRange(start + match.index, start + match.index + match[0].length);
-    }
-  }
-
-  function parseCommand(textarea, command) {
-    var tmp;
-    if (/^s\//.test(command) && (tmp = parseSedS(command.slice(1)))) {
-      replaceTextInRange(textarea, tmp[0], tmp[1], textarea.selectionStart, textarea.selectionEnd, "select");
-    } else if (/^s?\//.test(command) && (tmp = parseSearchS(command.replace(/^s/, "")))) {
-      selectTextInRange(textarea, tmp, textarea.selectionStart, textarea.selectionEnd);
-    } else {
-      // tmp = extractCommandParameters(command);  // XXX
-      if (tmp) {} else alert("invalid command");
-    }
-  }
-
-  //shortcuts["Ctrl-Z"] = function (event) {  // not really accurate... but still
-  //  var t = event.target, orig;
-  //  if (t.disabled || t.readOnly()) { return; }
-  //  orig = t.value;
-  //  setTimeout(function () {
-  //    if (t.selectionStart !== 0 || t.selectionEnd !== t.value.length) { return; }  // do nothing if the cursor is placed
-  //    var last = t.value, i, l = orig.length;
-  //    if (l > last.length) { l = last.length; }
-  //    for (i = 0; i < l; i += 1) {
-  //      if (orig[i] !== last[i]) {
-  //        t.setSelectionRange(i, i);
-  //        workaroundTextareaScroll(t);
-  //        return;
-  //      }
-  //    }
-  //  });
-  //};
-  //// The two functions below are buggy in chrome 51 and does not work with firefox 49
-  //shortcuts["Alt-U"] = function (event) {
-  //  if (event.target.disabled) { return; }
-  //  event.preventDefault();
-  //  if (event.target.readOnly) { return; }
-  //  document.execCommand("undo");
-  //};
-  //shortcuts["Alt-Shift-U"] = function (event) {
-  //  if (event.target.disabled) { return; }
-  //  event.preventDefault();
-  //  if (event.target.readOnly) { return; }
-  //  document.execCommand("redo");
-  //};
-
-  */
 
 }());
