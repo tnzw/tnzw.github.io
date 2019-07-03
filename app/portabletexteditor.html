@@ -2,7 +2,7 @@
 <html><head>
   <meta charset="UTF-8">
 
-  <!-- portabletexteditor.html Version 1.0.1
+  <!-- portabletexteditor.html Version 1.3.1
        Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
        This program is free software. It comes without any warranty, to
        the extent permitted by applicable law. You can redistribute it
@@ -32,11 +32,30 @@
   <style>.pell-content a[download]::after { content: "[" attr(data-size) " " attr(download) "]"; }</style>
   <style>.pell-content img { max-width: 100vw; max-height: 90vh; }</style>
   <style>.pell-content img[uploading] { opacity: 0.5; }</style>
+  <style>.pell-content blockquote { border-left: solid 1px blue; padding: 0 0 0 1em; margin: 1em 0 1em 0; }</style>
 
   <script>
 var version = (/Version (.*)/m).exec(document.head.innerHTML)[1],
     fileInput = null,
-    fileIconDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII=";
+    fileIconDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII=",
+    formatMediatypes = {
+      "css": "text/css",
+      "gif": "image/gif",
+      "jpeg": "image/jpeg",
+      "jpg": "image/jpeg",
+      "js": "application/javascript",
+      "ogg": "audio/ogg",
+      "pdf": "application/pdf",
+      "png": "image/png",
+      "mp3": "audio/mpeg",
+      "mp4": "video/mp4",
+      "tiff": "image/tiff",
+      "svg": "image/svg+xml",
+      "txt": "text/plain",
+      "wav": "audio/wav",
+      "webm": "video/webm"
+      //"zip": "application/zip"
+    };
 
 function setHtml(value) { document.body.querySelector(".pell-content").innerHTML = value; }
 function getHtml() { return document.body.querySelector(".pell-content").innerHTML; }
@@ -114,8 +133,8 @@ if (initialData) {
   document.body.innerHTML = "";
 }
 
-//fileInput = dce("input", {type: "file", style: "display:none;"});
-fileInput = dce("input", {type: "file", tabindex: "-1", style: "position:fixed;opacity:0;"});
+//fileInput = dce("input", {type: "file", multiple: "multiple", style: "display:none;"});
+fileInput = dce("input", {type: "file", multiple: "multiple", tabindex: "-1", style: "position:fixed;opacity:0;"});
 document.body.appendChild(fileInput);
 document.body.appendChild(dce("div"));
 
@@ -180,59 +199,73 @@ pell.init({
       else { if (a) selectElementContents(a); pell.exec("unlink"); }
     }},
     /*"image",*/ {name: "image", icon: "📷", title: "Image", result: async function () {
+      fileInput.setAttribute("multiple", "multiple");
       var files = await openInputFileDialog(fileInput),
-          file = null, size = 0, part = null,
-          href = "", name = "",
-          img = null;
+          aa = null, ai = 0;
+      files = Array.from(files).filter(file => {
+        if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large image ? [${strSize(file.size)} ${file.name}]`)) return false;
+        return true;
+      });
       if (!files.length) return;
-      file = files[0];
-      if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large image ? (${strSize(file.size)})`)) return;
-      href = formatOf(file.name);
-      href = href ? `data:image/${href};base64,` : `data:application/octet-stream;base64,`;
-      pell.exec("insertHTML", `<img id=img-upload src=# />`);
+      pell.exec("insertHTML", `<img id=img-upload src=# />`.repeat(files.length));
       await null;
-      img = document.body.querySelector(".pell-content img#img-upload");
-      img.removeAttribute("id");
-      name = file.name || "untitled";
-      img.alt = `[0 ${name}]`;
-      img.setAttribute("uploading", "true");
-      while (size < file.size) {
-        part = file.slice(size, size + (9 * 1024));
-        href += btoa(await readBlob(part, "binarystring"));
-        size += part.size;
-        img.alt = `[${strSize(size)} ${name}]`;
+      aa = Array.from(document.body.querySelectorAll(".pell-content img#img-upload"));
+      for (let a of aa) a.removeAttribute("id");
+      for (let file of files) {
+        let img = aa[ai++], size = 0,
+            href = formatMediatypes[formatOf(file.name)] || "";
+        if (href) { href = `data:${href};base64,`; }
+        else {
+          href = formatOf(file.name) || "";
+          href = href ? `data:image/${href};base64,` : "data:application/octet-stream;base64,";
+        }
+        let name = file.name || "untitled";
+        img.alt = `[0 ${name}]`;
+        img.setAttribute("uploading", "true");
+        while (size < file.size) {
+          let part = file.slice(size, size + (9 * 1024));
+          href += btoa(await readBlob(part, "binarystring"));
+          size += part.size;
+          img.alt = `[${strSize(size)} ${name}]`;
+        }
+        img.src = href;
+        img.alt = `[${name}]`;
+        img.removeAttribute("uploading");
+        updateHeaderSizeButton();
       }
-      img.src = href;
-      img.alt = `[${name}]`;
-      img.removeAttribute("uploading");
-      updateHeaderSizeButton();
     }},
     /*"file",*/ {name: "file", icon: `<img src="${fileIconDataURL}"/>`, title: "File", result: async function () {
+      fileInput.setAttribute("multiple", "multiple");
       var files = await openInputFileDialog(fileInput),
-          file = null, size = 0, part = null,
-          href = "data:application/octet-stream;base64,",
-          a = null;
+          aa = null, ai = 0;
+      files = Array.from(files).filter(file => {
+        if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? [${strSize(file.size)} ${file.name}]`)) return false;
+        return true;
+      });
       if (!files.length) return;
-      file = files[0];
-      if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? (${strSize(file.size)})`)) return;
-      pell.exec("insertHTML", `<a id=a-upload><img src="${fileIconDataURL}"/></a>&nbsp;`);
+      pell.exec("insertHTML", `<a id=a-upload><img src="${fileIconDataURL}"/></a>&nbsp;`.repeat(files.length));
       await null;
-      a = document.body.querySelector(".pell-content a#a-upload");
-      a.removeAttribute("id");
-      a.download = file.name || "untitled";
-      a.setAttribute("data-size", "0B");
-      a.setAttribute("uploading", "true");
-      while (size < file.size) {
-        part = file.slice(size, size + (9 * 1024));
-        href += btoa(await readBlob(part, "binarystring"));
-        size += part.size;
-        a.setAttribute("data-size", strSize(size));
+      aa = Array.from(document.body.querySelectorAll(".pell-content a#a-upload"));
+      for (let a of aa) a.removeAttribute("id");
+      for (let file of files) {
+        let a = aa[ai++], size = 0,
+            href = `data:${formatMediatypes[formatOf(file.name)] || "application/octet-stream"};base64,`;
+        a.download = file.name || "untitled";
+        a.setAttribute("data-size", "0B");
+        a.setAttribute("uploading", "true");
+        while (size < file.size) {
+          let part = file.slice(size, size + (9 * 1024));
+          href += btoa(await readBlob(part, "binarystring"));
+          size += part.size;
+          a.setAttribute("data-size", strSize(size));
+        }
+        a.href = href;
+        a.removeAttribute("uploading");
+        updateHeaderSizeButton();
       }
-      a.href = href;
-      a.removeAttribute("uploading");
-      updateHeaderSizeButton();
     }},
     {name: "load", icon: "L<sub>oad</sub>", title: "Load", result: async function () {
+      fileInput.removeAttribute("multiple");
       var files = await openInputFileDialog(fileInput), file, html;
       if (!files.length) return;
       file = files[0];
@@ -254,6 +287,7 @@ pell.init({
       } else {
         setHtml(file.body.innerHTML);
       }
+      updateHeaderSizeButton();
       modified = false;
     }},
     {name: "save", icon: "S<sub>ave</sub>", title: "Save", result: async function () {
@@ -294,11 +328,13 @@ pell.init({
 
 // Allow to click on some links
 document.body.addEventListener("click", function (event) {
-  var a;
-  if (!(a = getATagParent(event.target))) return;
-  if (!a.download && !event.ctrlKey) return;
-  document.body.querySelector(".pell-content").contentEditable = false;
-  setTimeout(_ => document.body.querySelector(".pell-content").contentEditable = true, 100);
+  var a, e;
+  if ((a = getATagParent(event.target)) && (a.download || event.ctrlKey) ||
+      event.target.tagName === "INPUT" && event.target.type === "submit") {
+    e = document.body.querySelector(".pell-content");
+    e.contentEditable = false;
+    setTimeout(_ => e.contentEditable = true, 100);
+  }
 }, {passive: true, capture: true});
 
 // prevent quit if modified
