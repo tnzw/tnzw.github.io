@@ -1,7 +1,7 @@
 this.TcBlob = (function script() {
   "use strict";
 
-  /*! TcBlob.js Version 1.0.0
+  /*! TcBlob.js Version 1.1.0
 
       Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -104,8 +104,8 @@ this.TcBlob = (function script() {
     }
     return n.buffer;
   };
-  TcBlob.prototype.readAsText = function () {
-    var s = "", d = new TextDecoder("utf-8"), cc = this.chunks, cci = 0, ccl = cc.length;
+  TcBlob.prototype.readAsText = function (encoding) {
+    var s = "", d = new TextDecoder(encoding), cc = this.chunks, cci = 0, ccl = cc.length;
     while (cci < ccl) s += d.decode(cc[cci++], {stream: true});
     s += d.decode();
     return s;

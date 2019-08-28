@@ -2,7 +2,7 @@
 <html><head>
   <meta charset="UTF-8">
 
-  <!-- portabletexteditor.html Version 1.3.1
+  <!-- portabletexteditor.html Version 1.6.0
        Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
        This program is free software. It comes without any warranty, to
        the extent permitted by applicable law. You can redistribute it
@@ -13,30 +13,35 @@
   <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
   <style>body { margin: 0; padding: 0; }</style>
 
-  <!-- Modified version of pell.css -->
-  <style>.pell { border: 1px solid rgba(10, 10, 10, 0.1); box-sizing: border-box; }</style>
-  <style>.pell-content { box-sizing: border-box; height: 300px; outline: 0; overflow-y: auto; padding: 10px; }</style>
-  <style>.pell-button { background-color: transparent; border: none; cursor: pointer; height: 30px; outline: 0; min-width: 30px; vertical-align: bottom; }</style>
-  <style>.pell-actionbar { position: fixed; width: 100vw; }</style>
-  <style>.pell-actionbar { background-color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(10, 10, 10, 0.1); }</style>
-  <style>.pell-button-selected { background-color: rgba(0,0,0,0.1); }</style>
+  <style>body > div.pte { border: 1px solid rgba(10, 10, 10, 0.1); box-sizing: border-box; }</style>
+  <style>body > div.pte .pte-content { box-sizing: border-box; height: 300px; outline: 0; overflow-y: auto; padding: 10px; }</style>
+  <style>body > div.pte .pte-button { background-color: transparent; border: none; cursor: pointer; height: 2em; outline: 0; min-width: 2em; vertical-align: bottom; }</style>
+  <style>body > div.pte .pte-actionbar { position: fixed; width: 100vw; }</style>
+  <style>body > div.pte .pte-actionbar { background-color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(10, 10, 10, 0.1); }</style>
+  <style>body > div.pte .pte-button-selected { background-color: rgba(0,0,0,0.1); }</style>
+  <style>body > div.pte .pte-actionbar-text { display: inline-block; line-height: 2em; outline: 0; min-width: 2em; vertical-align: middle; font-size: 75%; }</style>
 
-  <style>@media only screen { .pell-content { height: 100vh; padding-top: calc(2em + 10px); } }</style>
-  <style>@media only screen and (max-width: 45em) { .pell-content { padding-top: calc(4em + 10px); } }</style>
-  <style>@media only screen { .pell-content * { background-color: rgba(0,0,0,0.03); } }</style>
-  <style>@media print { .pell-actionbar { display: none; } }</style>
-  <style>@media print { .pell-content { height: inherit; padding: 0; } }</style>
-  <style>.pell-button:focus { background-color: rgba(128, 128, 255, 0.2); }</style>
-  <style>.pell-content a[download] { border-style: solid; border-width: 1px; text-decoration: none; cursor: pointer; }</style>
-  <style>.pell-content a[download][uploading] { opacity: 0.5; cursor: default; }</style>
-  <style>.pell-content a[download]::after { content: "[" attr(data-size) " " attr(download) "]"; }</style>
-  <style>.pell-content img { max-width: 100vw; max-height: 90vh; }</style>
-  <style>.pell-content img[uploading] { opacity: 0.5; }</style>
-  <style>.pell-content blockquote { border-left: solid 1px blue; padding: 0 0 0 1em; margin: 1em 0 1em 0; }</style>
+  <style>@media only screen { body > div.pte .pte-content { height: calc(100vh - 2px); padding-top: calc(2em + 10px); } }</style>
+  <style>@media only screen and (max-width: 45em) { body > div.pte .pte-content { padding-top: calc(4em + 10px); } }</style>
+  <style>@media only screen { body > div.pte .pte-content * { background-color: rgba(0,0,0,0.03); } }</style>
+  <style>@media print { body > div.pte .pte-actionbar { display: none; } }</style>
+  <style>@media print { body > div.pte .pte-content { height: inherit; padding: 0; } }</style>
+  <style>body > div.pte .pte-button:focus { background-color: rgba(128, 128, 255, 0.2); }</style>
+  <style>body > div.pte .pte-content a[download] { border-style: solid; border-width: 1px; text-decoration: none; cursor: pointer; }</style>
+  <style>body > div.pte .pte-content a[download][uploading] { opacity: 0.5; cursor: default; }</style>
+  <style>body > div.pte .pte-content a[download]::after { content: "[" attr(data-size) " " attr(download) "]"; }</style>
+  <style>body > div.pte .pte-content img { max-width: 100vw; max-height: 90vh; }</style>
+  <style>body > div.pte .pte-content img[uploading] { opacity: 0.5; }</style>
+  <style>body > div.pte .pte-content blockquote { border-left: solid 1px blue; padding: 0 0 0 1em; margin: 1em 0 1em 0; }</style>
 
   <script>
+if (typeof nw !== "undefined" && typeof require !== "undefined")
+  document.title = `${require("path").basename(decodeURIComponent(location.pathname))} (${require("path").dirname(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname))})`;
+else
+  document.title = `${decodeURIComponent(location.pathname.replace(/^.*\//, ""))} (${decodeURIComponent(location.pathname.replace(/\/[^\/]*$/, ""))})`;
 var version = (/Version (.*)/m).exec(document.head.innerHTML)[1],
-    fileInput = null,
+    editor, topSize,
+    fileInput,
     fileIconDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII=",
     formatMediatypes = {
       "css": "text/css",
@@ -57,26 +62,34 @@ var version = (/Version (.*)/m).exec(document.head.innerHTML)[1],
       //"zip": "application/zip"
     };
 
-function setHtml(value) { document.body.querySelector(".pell-content").innerHTML = value; }
-function getHtml() { return document.body.querySelector(".pell-content").innerHTML; }
-function focusHtml() { document.body.querySelector(".pell-content").focus(); }
+function setHtml(value) { editor.innerHTML = value; }
+function getHtml() { return editor.innerHTML; }
+function focusHtml() { editor.focus(); }
 
-function updateHeaderSizeButton() { document.querySelector('.pell-button[title="Size"]').innerHTML = strSize(getHtml().length); return null; }
-updateHeaderSizeButton.delay = function (interval) {
-  if (updateHeaderSizeButton.timer) clearTimeout(updateHeaderSizeButton.timer);
-  updateHeaderSizeButton.timer = setTimeout(_ => updateHeaderSizeButton.timer = updateHeaderSizeButton(), interval);
-};
+function updateHeaderSizeButton() { topSize.innerHTML = strSize(getHtml().length); return null; }
+updateHeaderSizeButton.delay = function (interval) { var f = updateHeaderSizeButton; if (f.timer) clearTimeout(f.timer); f.timer = setTimeout(_ => f.timer = f(), interval); };
 
 function dce(tagName, attrs, nodes) { var e = document.createElement(tagName); for (let k of Object.keys(attrs || 0)) e.setAttribute(k, attrs[k]); if (typeof nodes === "string") e.innerHTML = nodes; else if (nodes) for (let c of nodes) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); return e; }
 function getATagParent(e) { while (e) { if (e.tagName === "A") return e; e = e.parentElement; } return null; }
 function getHTagParent(e) { while (e) { if (e.tagName && e.tagName.length === 2 && e.tagName[0] === "H") return e; e = e.parentElement; } return null; }
-function formatOf(name) { return name.slice(1).replace(/[^\.]*\./g, ""); }
+function getBlockquoteTagParent(e) { while (e) { if (e.tagName === "BLOCKQUOTE") return e; e = e.parentElement; } return null; }
+function getBlockquoteTagParent_1(e) { var last; while (e) { if (e.tagName === "BLOCKQUOTE") return last; last = e; e = e.parentElement; } return null; }
+function getExplicitOriginalTarget(event) { return event.explicitOriginalTarget || (event.path && event.path[0]) || null; }
+function formatOf(name) { var s = name.slice(1).split(".").slice(1); return s[s.length - 1] || ""; }
 function strSize(size) { var sizes = ["B", "KB", "MB", "GB", "PB"], i = 0, l = sizes.length - 1; while (i < l && size > 9999) { i += 1; size = (size / 1000)|0; } return size + sizes[i]; }
 function binaryStringToUint8Array(binarystring) { var i = binarystring.length, u = new Uint8Array(i); while (--i >= 0) u[i] = binarystring.charCodeAt(i); return u; }
 function* iterarrays(arrays) { for (let array of arrays) for (let v of array) yield v; }
 function newname(origName) { return origName.replace(/( |)\(([0-9]+)\)(\.[^\.]+)$/, (m, s, n, e) => `${s}${e}`); };
+function exec(command, value) { return document.execCommand(command, false, value === undefined ? null : value); };
+function selectElement(el) { var sel, r = document.createRange(); r.selectNode(el); sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+function selectElementContents(el) { var sel, r = document.createRange(); r.selectNodeContents(el); sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+function selectElementStart(el, offset, correction) { var sel, r = document.createRange(); r[`setStart${correction || ""}`](el, offset|0); r.collapse(true); sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+function selectElementEnd(el) { var sel, r = document.createRange(); r.selectNodeContents(el); r.collapse(false); sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+function selectEditorTopAfterElementFromPagePosition(x, y) { for (let e of editor.childNodes) if (e.offsetTop > y) return e; return null; }
+function getCursorNode() { return window.getSelection().anchorNode; }
+function insertAfter(newNode, refNode) { var s = refNode.nextSibling; if (s) refNode.parentNode.insertBefore(newNode, s); else refNode.parentNode.appendChild(newNode); }
 
-// Encryption inpired by openssl aes-256-cbc.
+// Encryption inspired by openssl aes-256-cbc.
 async function hash(data) { if (typeof data === "string") data = new TextEncoder().encode(data); return new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(data))); }
 async function encrypt(data, password) {
   if (typeof data === "string") data = new TextEncoder().encode(data);
@@ -100,14 +113,17 @@ window.addEventListener("load", async function () {
 
 var initialData = "",
     modified = false,
-    pwdContainer, pwd, magic;
+    pwdContainer, pwd, magic, pwdButton, element, bar,
+    defaultParagraphSeparator = "p"; // "div";
 
 pwdContainer = dce("span", {}, [pwd = dce("input", {type: "password"}), magic = document.createTextNode("")]);
 pwd.addEventListener("blur",    e => { setTimeout(_ => pwdContainer.remove()); setTimeout(_ => e.target.cont()); }, {passive: true});
 pwd.promise = new Promise(r => pwd.cont = r);
 pwd.addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); }, {passive: true});
 pwd.addEventListener("input", function pwdInputListener() {  // magic !
-  if (!pwd.value) { magic.textContent = ""; return; }
+  var pb = pwdButton || {};
+  if (!pwd.value) { magic.textContent = ""; pb.innerHTML = "&#9919;"; return; }
+  pb.innerHTML = "&#128274;";
   clearTimeout(pwdInputListener.timer);
   magic.textContent = "...";
   pwdInputListener.timer = setTimeout(async function () {
@@ -136,461 +152,253 @@ if (initialData) {
 //fileInput = dce("input", {type: "file", multiple: "multiple", style: "display:none;"});
 fileInput = dce("input", {type: "file", multiple: "multiple", tabindex: "-1", style: "position:fixed;opacity:0;"});
 document.body.appendChild(fileInput);
-document.body.appendChild(dce("div"));
+document.body.appendChild(element = dce("div", {class: "pte"}));
 
-document.body.querySelector("div").innerHTML = "";
+bar = dce("div", {class: "pte-actionbar"});
+element.appendChild(bar);
+editor = dce("div", {class: "pte-content", contenteditable: "true"});
+element.appendChild(editor);
 
-function selectElementContents(el) { var sel, r = document.createRange(); r.selectNodeContents(el); sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
-
-// Initialize pell on an HTMLElement
-pell.init({
-  // <HTMLElement>, required
-  element: document.body.querySelector("div"),
-
-  // <Function>, required
-  // Use the output html, triggered by element's `oninput` event
-  onChange: html => { modified = true; updateHeaderSizeButton.delay(500); },
-
-  // <string>, optional, default = 'div'
-  // Instructs the editor which element to inject via the return key
-  defaultParagraphSeparator: "p",
-
-  // <boolean>, optional, default = false
-  // Outputs <span style="font-weight: bold;"></span> instead of <b></b>
-  styleWithCSS: false,
-
-  // <Array[string | Object]>, string if overwriting, object if customizing/creating
-  // action.name<string> (only required if overwriting)
-  // action.icon<string> (optional if overwriting, required if custom action)
-  // action.title<string> (optional)
-  // action.result<Function> (required)
-  // Specify the actions you specifically want (in order)
-  actions: [
-    {name: "title", icon: `<sup>Portable Text Editor ${version}</sup>`, result: _ => _},
-    "bold",
-    "italic",
-    "underline",
-    "strikethrough",
-    /*"heading1",*/ {name: "heading+", icon: "<b>H<sub>+</sub></b>", title: "Heading", result: _ => {
-      var h = getHTagParent(window.getSelection().anchorNode) || "", hn = 0;
-      if (!h) return pell.exec("formatBlock", "<h1>");
-      hn = (h.tagName.slice(1)|0) + 1;
-      pell.exec("formatBlock", "h" + hn);
-    }},
-    /*"heading2",*/ {name: "heading-", icon: "<b>H<sub>-</sub></b>", title: "Heading", result: _ => {
-      var h = getHTagParent(window.getSelection().anchorNode) || "", hn = 0;
-      if (!h) return;  // pell.exec("formatBlock", "<h1>");
-      hn = (h.tagName.slice(1)|0) - 1;
-      if (hn === 0) pell.exec("formatBlock", "p");
-      pell.exec("formatBlock", "h" + hn);
-    }},
-    //"paragraph",
-    /*"quote",*/ {name: "quote", icon: "«»", title: "Quote", result: _ => pell.exec("formatBlock", "<blockquote>")},
-    "olist",
-    "ulist",
-    "code",
-    "line",
-    /*"link",*/ {name: "link", icon: "🔗", title: "Link", result: _ => {
-      var a = getATagParent(window.getSelection().anchorNode) || "",
-          url = prompt("Enter the link URL", a && a.getAttribute("href") || "");
-      if (url === null) return;
-      if (a && url) a.href = url;
-      else if (url) pell.exec("createLink", url);
-      else { if (a) selectElementContents(a); pell.exec("unlink"); }
-    }},
-    /*"image",*/ {name: "image", icon: "📷", title: "Image", result: async function () {
-      fileInput.setAttribute("multiple", "multiple");
-      var files = await openInputFileDialog(fileInput),
-          aa = null, ai = 0;
-      files = Array.from(files).filter(file => {
-        if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large image ? [${strSize(file.size)} ${file.name}]`)) return false;
-        return true;
-      });
-      if (!files.length) return;
-      pell.exec("insertHTML", `<img id=img-upload src=# />`.repeat(files.length));
-      await null;
-      aa = Array.from(document.body.querySelectorAll(".pell-content img#img-upload"));
-      for (let a of aa) a.removeAttribute("id");
-      for (let file of files) {
-        let img = aa[ai++], size = 0,
-            href = formatMediatypes[formatOf(file.name)] || "";
-        if (href) { href = `data:${href};base64,`; }
-        else {
-          href = formatOf(file.name) || "";
-          href = href ? `data:image/${href};base64,` : "data:application/octet-stream;base64,";
-        }
-        let name = file.name || "untitled";
-        img.alt = `[0 ${name}]`;
-        img.setAttribute("uploading", "true");
-        while (size < file.size) {
-          let part = file.slice(size, size + (9 * 1024));
-          href += btoa(await readBlob(part, "binarystring"));
-          size += part.size;
-          img.alt = `[${strSize(size)} ${name}]`;
-        }
-        img.src = href;
-        img.alt = `[${name}]`;
-        img.removeAttribute("uploading");
-        updateHeaderSizeButton();
-      }
-    }},
-    /*"file",*/ {name: "file", icon: `<img src="${fileIconDataURL}"/>`, title: "File", result: async function () {
-      fileInput.setAttribute("multiple", "multiple");
-      var files = await openInputFileDialog(fileInput),
-          aa = null, ai = 0;
-      files = Array.from(files).filter(file => {
-        if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? [${strSize(file.size)} ${file.name}]`)) return false;
-        return true;
-      });
-      if (!files.length) return;
-      pell.exec("insertHTML", `<a id=a-upload><img src="${fileIconDataURL}"/></a>&nbsp;`.repeat(files.length));
-      await null;
-      aa = Array.from(document.body.querySelectorAll(".pell-content a#a-upload"));
-      for (let a of aa) a.removeAttribute("id");
-      for (let file of files) {
-        let a = aa[ai++], size = 0,
-            href = `data:${formatMediatypes[formatOf(file.name)] || "application/octet-stream"};base64,`;
-        a.download = file.name || "untitled";
-        a.setAttribute("data-size", "0B");
-        a.setAttribute("uploading", "true");
-        while (size < file.size) {
-          let part = file.slice(size, size + (9 * 1024));
-          href += btoa(await readBlob(part, "binarystring"));
-          size += part.size;
-          a.setAttribute("data-size", strSize(size));
-        }
-        a.href = href;
-        a.removeAttribute("uploading");
-        updateHeaderSizeButton();
-      }
-    }},
-    {name: "load", icon: "L<sub>oad</sub>", title: "Load", result: async function () {
-      fileInput.removeAttribute("multiple");
-      var files = await openInputFileDialog(fileInput), file, html;
-      if (!files.length) return;
-      file = files[0];
-      if (modified && !confirm("Load document? Changes that you made may not be saved.")) return;
-      if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? (${strSize(file.size)})`)) return;
-      file = await readBlob(file, "text");
-      file = new DOMParser().parseFromString(file, "text/html");
-      if (pwd.value) {
-        html = file.body.getAttribute("data-ciphered");
-        if (html) {
-          html = atob(html);
-          html = binaryStringToUint8Array(html);
-          html = await decrypt(html, pwd.value);
-          html = new TextDecoder().decode(html);
-          setHtml(html);
-        } else {
-          setHtml(file.body.innerHTML);
-        }
-      } else {
-        setHtml(file.body.innerHTML);
-      }
-      updateHeaderSizeButton();
-      modified = false;
-    }},
-    {name: "save", icon: "S<sub>ave</sub>", title: "Save", result: async function () {
-      var data = "", a;
-      if (pwd.value) {
-        data = await encrypt(getHtml(), pwd.value);
-        data = await readBlob(new Blob([data]), "binarystring");
-        data = btoa(data);
-        data = `<!DOCTYPE html>\n<html>${document.head.outerHTML}<body data-ciphered="${data}"></body></html>\n`;
-      } else {
-        data = `<!DOCTYPE html>\n<html>${document.head.outerHTML}<body>${getHtml()}</body></html>\n`;
-      }
-
-      a = dce("a", {tabIndex: -1, style: "display:none;", href: URL.createObjectURL(new Blob([data])), download: decodeURIComponent(location.pathname.replace(/^.*\//, "")) || "untitled.html"});
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { document.body.removeChild(a); });
-
-      modified = false;
-      setTimeout(_ => focusHtml(), 100);
-    }},
-    {name: "size", icon: strSize(initialData.length), title: "Size", result: () => undefined},
-    {name: "pwd", icon: "🔒", title: "Encipher", result: async function () {
-      document.body.querySelector(".pell-actionbar").appendChild(pwdContainer);
-      setTimeout(_ => pwd.focus());
-    }}
-  ],
-
-  // classes<Array[string]> (optional)
-  // Choose your custom class names
-  classes: {
-    actionbar: 'pell-actionbar',
-    button: 'pell-button',
-    content: 'pell-content',
-    selected: 'pell-button-selected'
+editor.addEventListener("input", function () {
+  var fC = editor.firstChild;
+  if (fC) {
+    if (fC.nodeType === 3) exec("formatBlock", "<" + defaultParagraphSeparator + ">");
+    else if (fC.tagName === "BR" && !fC.nextSibling) editor.innerHTML = "";
   }
-});
+  modified = true;
+  updateHeaderSizeButton.delay(500);
+}, {passive: true});
+
+//editor.addEventListener("keydown", function (event) {
+//  if (!event.shiftKey && event.key === "Enter")
+//    if (document.queryCommandValue("formatBlock") === "blockquote")
+//      setTimeout(_ => exec("formatBlock", "<" + defaultParagraphSeparator + ">"));
+//}, {passive: true});
+
+//exec("styleWithCSS");
+exec("defaultParagraphSeparator", defaultParagraphSeparator);
+
+async function uploadImages(files) {
+  var aa = null, ai = 0;
+  files = Array.from(files).filter(file => {
+    if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large image ? [${strSize(file.size)} ${file.name}]`)) return false;
+    return true;
+  });
+  if (!files.length) return;
+  exec("insertHTML", `<img id=img-upload src=# />`.repeat(files.length));
+  await null;
+  aa = Array.from(editor.querySelectorAll("img#img-upload"));
+  for (let a of aa) a.removeAttribute("id");
+  for (let file of files) {
+    let img = aa[ai++], size = 0,
+        href = formatMediatypes[formatOf(file.name)] || "";
+    if (href) { href = `data:${href};base64,`; }
+    else {
+      href = formatOf(file.name) || "";
+      href = href ? `data:image/${href};base64,` : "data:application/octet-stream;base64,";
+    }
+    let name = file.name || "untitled";
+    img.alt = `[0 ${name}]`;
+    img.setAttribute("uploading", "true");
+    while (size < file.size) {
+      let part = file.slice(size, size + (9 * 1024));
+      href += btoa(await readBlob(part, "binarystring"));
+      size += part.size;
+      img.alt = `[${strSize(size)} ${name}]`;
+    }
+    img.src = href;
+    img.alt = `[${name}]`;
+    img.removeAttribute("uploading");
+    updateHeaderSizeButton();
+  }
+}
+async function uploadFiles(files) {
+  var aa = null, ai = 0;
+  files = Array.from(files).filter(file => {
+    if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? [${strSize(file.size)} ${file.name}]`)) return false;
+    return true;
+  });
+  if (!files.length) return;
+  exec("insertHTML", `<a id=a-upload><img src="${fileIconDataURL}"/></a>&nbsp;`.repeat(files.length));
+  await null;
+  aa = Array.from(editor.querySelectorAll("a#a-upload"));
+  for (let a of aa) a.removeAttribute("id");
+  for (let file of files) {
+    let a = aa[ai++], size = 0,
+        href = `data:${formatMediatypes[formatOf(file.name)] || "application/octet-stream"};base64,`;
+    a.download = file.name || "untitled";
+    a.setAttribute("data-size", "0B");
+    a.setAttribute("uploading", "true");
+    while (size < file.size) {
+      let part = file.slice(size, size + (9 * 1024));
+      href += btoa(await readBlob(part, "binarystring"));
+      size += part.size;
+      a.setAttribute("data-size", strSize(size));
+    }
+    a.href = href;
+    a.removeAttribute("uploading");
+    updateHeaderSizeButton();
+  }
+}
+
+function appendText(inner) { var node = dce("span", {class: "pte-actionbar-text"}, inner); bar.appendChild(node); return node; }
+function appendButton(action) {
+  var button = dce("button", {class: "pte-button", type: "button", name: action.name, title: action.title}, action.inner);
+  button.addEventListener("click", _ => { action.result() && editor.focus(); }, {passive: true});
+  function handler() { return button.classList[action.state() ? 'add' : 'remove']("pte-button-selected"); }
+  if (action.state) {
+    editor.addEventListener("keyup", handler);
+    editor.addEventListener("mouseup", handler);
+    button.addEventListener("click", handler);
+  }
+  bar.appendChild(button);
+  return button;
+}
+
+appendText(`Portable Text Editor ${version}`);
+//appendButton({name: "undo", inner: "&#9100;", title: "Undo", result: _ => exec("undo")});
+appendButton({name: "bold", inner: '<b>B</b>', title: 'Bold', state: function state() { return document.queryCommandState('bold'); }, result: function result() { return exec('bold'); }});
+appendButton({name: "italic", inner: '<i>I</i>', title: 'Italic', state: function state() { return document.queryCommandState('italic'); }, result: function result() { return exec('italic'); }});
+appendButton({name: "underline", inner: '<u>U</u>', title: 'Underline', state: function state() { return document.queryCommandState('underline'); }, result: function result() { return exec('underline'); }});
+appendButton({name: "strikethrough", inner: '<strike>S</strike>', title: 'Strike-through', state: function state() { return document.queryCommandState('strikeThrough'); }, result: function result() { return exec('strikeThrough'); }});
+//{name: "heading1", inner: '<b>H<sub>1</sub></b>', title: 'Heading 1', result: function result() { return exec("formatBlock", "<h1>"); }},
+appendButton({name: "headingmore", inner: "<b>H<sub>+</sub></b>", title: "Heading", result: _ => {
+  var h = getHTagParent(getCursorNode()) || "", hn = 0;
+  if (!h) return exec("formatBlock", "<h1>");
+  hn = (h.tagName.slice(1)|0) + 1;
+  return exec("formatBlock", `<h${hn}>`);
+}});
+//{name: "heading2", inner: '<b>H<sub>2</sub></b>', title: 'Heading 2', result: function result() { return exec("formatBlock", "<h2>"); }},
+appendButton({name: "headingless", inner: "<b>H<sub>-</sub></b>", title: "Heading", result: _ => {
+  var h = getHTagParent(getCursorNode()) || "", hn = 0;
+  if (!h) {  // return true;  // exec("formatBlock", "<h1>");
+    if (h = getBlockquoteTagParent(getCursorNode())) { selectElement(h); exec("insertHTML", h.innerHTML); }
+    return true;
+  }
+  hn = (h.tagName.slice(1)|0) - 1;
+  if (hn === 0) return exec("formatBlock", "<" + defaultParagraphSeparator + ">");
+  return exec("formatBlock", `<h${hn}>`);
+}});
+//{name: "paragraph", inner: '&para;', title: 'Paragraph', result: function result() { return exec("formatBlock", "<p>"); }},
+//appendButton({name: "quote", inner: '&#8220; &#8221;', title: 'Quote', result: function result() { return exec("formatBlock", "<blockquote>"); }});
+appendButton({name: "quote", inner: "&laquo;&raquo;", title: "Quote", result: _ => exec("formatBlock", "<blockquote>")});
+appendButton({name: "olist", inner: '&#35;', title: 'Ordered List', result: function result() { return exec('insertOrderedList'); }});
+appendButton({name: "ulist", inner: '&bull;', title: 'Unordered List', result: function result() { return exec('insertUnorderedList'); }});
+appendButton({name: "code", inner: '&lt;/&gt;', title: 'Code', result: function result() { return exec("formatBlock", "<pre>"); }});
+appendButton({name: "line", inner: '&#8213;', title: 'Horizontal Line', result: function result() { return exec('insertHorizontalRule'); }});
+//{name: "link", inner: '&#128279;', title: 'Link', result: function result() { var url = window.prompt('Enter the link URL'); if (url) exec('createLink', url); }},
+appendButton({name: "link", inner: "🔗", title: "Link", result: _ => {
+  var a = getATagParent(getCursorNode()) || "",
+      url = prompt("Enter the link URL", a && a.getAttribute("href") || "");
+  if (url === null) return;
+  if (a && url) a.href = url;
+  else if (url) exec("createLink", url);
+  else { if (a) selectElementContents(a); exec("unlink"); }
+}});
+//{name: "image", inner: '&#128247;', title: 'Image', result: function result() { var url = window.prompt('Enter the image URL'); if (url) exec('insertImage', url); }},
+appendButton({name: "image", inner: "📷", title: "Image", result: async function () { fileInput.setAttribute("multiple", "multiple"); await uploadImages(await openInputFileDialog(fileInput)); }});
+appendButton({name: "file", inner: `<img src="${fileIconDataURL}"/>`, title: "File", result: async function () { fileInput.setAttribute("multiple", "multiple"); await uploadFiles(await openInputFileDialog(fileInput)); }});
+if (!(typeof nw !== "undefined" && typeof require !== "undefined"))
+appendButton({name: "load", inner: "L<sub>oad</sub>", title: "Load", result: async function () {
+  if (typeof nw !== "undefined" && typeof require !== "undefined")
+    fileInput.setAttribute("nwworkingdir", require("path").dirname(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname)));
+  fileInput.removeAttribute("multiple");
+  var files = await openInputFileDialog(fileInput), file, html;
+  if (!files.length) return;
+  file = files[0];
+  if (modified && !confirm("Load document? Changes that you made may not be saved.")) return;
+  if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? (${strSize(file.size)})`)) return;
+  file = await readBlob(file, "text");
+  file = new DOMParser().parseFromString(file, "text/html");
+  if (pwd.value) {
+    html = file.body.getAttribute("data-ciphered");
+    if (html) {
+      html = atob(html);
+      html = binaryStringToUint8Array(html);
+      html = await decrypt(html, pwd.value);
+      html = new TextDecoder().decode(html);
+      setHtml(html);
+    } else {
+      setHtml(file.body.innerHTML);
+    }
+  } else {
+    setHtml(file.body.innerHTML);
+  }
+  updateHeaderSizeButton();
+  modified = false;
+}});
+appendButton({name: "save", inner: "S<sub>ave</sub>", title: "Save", result: async function () {
+  var data = "", a;
+  if (pwd.value) {
+    data = await encrypt(getHtml(), pwd.value);
+    data = await readBlob(new Blob([data]), "binarystring");
+    data = btoa(data);
+    data = `<!DOCTYPE html>\n<html>${document.head.outerHTML}<body data-ciphered="${data}"></body></html>\n`;
+  } else {
+    data = `<!DOCTYPE html>\n<html>${document.head.outerHTML}<body>${getHtml()}</body></html>\n`;
+  }
+
+  if (typeof nw !== "undefined" && typeof require !== "undefined") {
+    require("fs").writeFileSync(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname), data);
+    alert("Saved");
+  } else {
+    a = dce("a", {tabIndex: -1, style: "display:none;", href: URL.createObjectURL(new Blob([data])), download: decodeURIComponent(location.pathname.replace(/^.*\//, "")) || "untitled.html"});
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { document.body.removeChild(a); });
+  }
+
+  modified = false;
+  setTimeout(_ => editor.focus(), 100);
+}});
+topSize = appendText(strSize(initialData.length));
+pwdButton = appendButton({name: "pwd", inner: pwd.value ? "🔒" : "&#9919;", title: "Encipher", result: function () { bar.appendChild(pwdContainer); setTimeout(_ => pwd.focus()); }});
+
+// handle drag and drop
+editor.addEventListener("drop", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  var eot = getExplicitOriginalTarget(event), e;
+  if (eot.nodeType === 3)
+    selectElementStart(eot, event.rangeOffset);
+  else if (eot === editor && (e = selectEditorTopAfterElementFromPagePosition(editor.scrollLeft + event.clientX, editor.scrollTop + event.clientY)))
+    selectElementStart(e, 0, "Before");
+  else
+    selectElementEnd(eot);
+  if (event.shiftKey)
+    return uploadFiles(event.dataTransfer.files);
+  for (let file of event.dataTransfer.files)
+    if (!(formatMediatypes[formatOf(file.name)] || "").startsWith("image/"))
+      return uploadFiles(event.dataTransfer.files);
+  uploadImages(event.dataTransfer.files);
+}, {capture: true});
 
 // Allow to click on some links
 document.body.addEventListener("click", function (event) {
-  var a, e;
+  var a;
   if ((a = getATagParent(event.target)) && (a.download || event.ctrlKey) ||
       event.target.tagName === "INPUT" && event.target.type === "submit") {
-    e = document.body.querySelector(".pell-content");
-    e.contentEditable = false;
-    setTimeout(_ => e.contentEditable = true, 100);
+    editor.contentEditable = false;
+    setTimeout(_ => editor.contentEditable = true, 100);
   }
 }, {passive: true, capture: true});
 
 // prevent quit if modified
 window.onbeforeunload = function () { if (modified) return "Reload site? Changes that you made may not be saved."; };
 
-// save with Ctrl-S
-document.querySelector(".pell-content").addEventListener("keydown", function (event) {
-  if (event.ctrlKey && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[title=Save]").click(); return; }
-  if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[title=Load]").click(); return; }
-  if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "l") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[title=Link]").click(); return; }
+// add some keyboard shortcuts
+editor.addEventListener("keydown", function (event) {
+  if (event.ctrlKey && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=save]").click(); return; }
+  if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=load]").click(); return; }
+  if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "l") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=link]").click(); return; }
 }, {capture: true});
 
 setHtml(initialData);
 initialData = undefined;
 
-setTimeout(_ => focusHtml());
+setTimeout(_ => editor.focus());
 
 });
-  </script>
-  <script>
-/*! pell.js Version 1.0.6
-
-The MIT License (MIT)
-
-Copyright (c) Jared Reich
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
-
-(function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.pell = {})));
-}(this, (function (exports) { 'use strict';
-
-var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
-
-var defaultParagraphSeparatorString = 'defaultParagraphSeparator';
-var formatBlock = 'formatBlock';
-var addEventListener = function addEventListener(parent, type, listener) {
-  return parent.addEventListener(type, listener);
-};
-var appendChild = function appendChild(parent, child) {
-  return parent.appendChild(child);
-};
-var createElement = function createElement(tag) {
-  return document.createElement(tag);
-};
-var queryCommandState = function queryCommandState(command) {
-  return document.queryCommandState(command);
-};
-var queryCommandValue = function queryCommandValue(command) {
-  return document.queryCommandValue(command);
-};
-
-var exec = function exec(command) {
-  var value = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
-  return document.execCommand(command, false, value);
-};
-
-var defaultActions = {
-  bold: {
-    icon: '<b>B</b>',
-    title: 'Bold',
-    state: function state() {
-      return queryCommandState('bold');
-    },
-    result: function result() {
-      return exec('bold');
-    }
-  },
-  italic: {
-    icon: '<i>I</i>',
-    title: 'Italic',
-    state: function state() {
-      return queryCommandState('italic');
-    },
-    result: function result() {
-      return exec('italic');
-    }
-  },
-  underline: {
-    icon: '<u>U</u>',
-    title: 'Underline',
-    state: function state() {
-      return queryCommandState('underline');
-    },
-    result: function result() {
-      return exec('underline');
-    }
-  },
-  strikethrough: {
-    icon: '<strike>S</strike>',
-    title: 'Strike-through',
-    state: function state() {
-      return queryCommandState('strikeThrough');
-    },
-    result: function result() {
-      return exec('strikeThrough');
-    }
-  },
-  heading1: {
-    icon: '<b>H<sub>1</sub></b>',
-    title: 'Heading 1',
-    result: function result() {
-      return exec(formatBlock, '<h1>');
-    }
-  },
-  heading2: {
-    icon: '<b>H<sub>2</sub></b>',
-    title: 'Heading 2',
-    result: function result() {
-      return exec(formatBlock, '<h2>');
-    }
-  },
-  paragraph: {
-    icon: '&#182;',
-    title: 'Paragraph',
-    result: function result() {
-      return exec(formatBlock, '<p>');
-    }
-  },
-  quote: {
-    icon: '&#8220; &#8221;',
-    title: 'Quote',
-    result: function result() {
-      return exec(formatBlock, '<blockquote>');
-    }
-  },
-  olist: {
-    icon: '&#35;',
-    title: 'Ordered List',
-    result: function result() {
-      return exec('insertOrderedList');
-    }
-  },
-  ulist: {
-    icon: '&#8226;',
-    title: 'Unordered List',
-    result: function result() {
-      return exec('insertUnorderedList');
-    }
-  },
-  code: {
-    icon: '&lt;/&gt;',
-    title: 'Code',
-    result: function result() {
-      return exec(formatBlock, '<pre>');
-    }
-  },
-  line: {
-    icon: '&#8213;',
-    title: 'Horizontal Line',
-    result: function result() {
-      return exec('insertHorizontalRule');
-    }
-  },
-  link: {
-    icon: '&#128279;',
-    title: 'Link',
-    result: function result() {
-      var url = window.prompt('Enter the link URL');
-      if (url) exec('createLink', url);
-    }
-  },
-  image: {
-    icon: '&#128247;',
-    title: 'Image',
-    result: function result() {
-      var url = window.prompt('Enter the image URL');
-      if (url) exec('insertImage', url);
-    }
-  }
-};
-
-var defaultClasses = {
-  actionbar: 'pell-actionbar',
-  button: 'pell-button',
-  content: 'pell-content',
-  selected: 'pell-button-selected'
-};
-
-var init = function init(settings) {
-  var actions = settings.actions ? settings.actions.map(function (action) {
-    if (typeof action === 'string') return defaultActions[action];else if (defaultActions[action.name]) return _extends({}, defaultActions[action.name], action);
-    return action;
-  }) : Object.keys(defaultActions).map(function (action) {
-    return defaultActions[action];
-  });
-
-  var classes = _extends({}, defaultClasses, settings.classes);
-
-  var defaultParagraphSeparator = settings[defaultParagraphSeparatorString] || 'div';
-
-  var actionbar = createElement('div');
-  actionbar.className = classes.actionbar;
-  appendChild(settings.element, actionbar);
-
-  var content = settings.element.content = createElement('div');
-  content.contentEditable = true;
-  content.className = classes.content;
-  content.oninput = function (_ref) {
-    var firstChild = _ref.target.firstChild;
-
-    if (firstChild && firstChild.nodeType === 3) exec(formatBlock, '<' + defaultParagraphSeparator + '>');else if (content.innerHTML === '<br>') content.innerHTML = '';
-    settings.onChange(content.innerHTML);
-  };
-  content.onkeydown = function (event) {
-    if (event.key === 'Enter' && queryCommandValue(formatBlock) === 'blockquote') {
-      setTimeout(function () {
-        return exec(formatBlock, '<' + defaultParagraphSeparator + '>');
-      }, 0);
-    }
-  };
-  appendChild(settings.element, content);
-
-  actions.forEach(function (action) {
-    var button = createElement('button');
-    button.className = classes.button;
-    button.innerHTML = action.icon;
-    button.title = action.title;
-    button.setAttribute('type', 'button');
-    button.onclick = function () {
-      return action.result() && content.focus();
-    };
-
-    if (action.state) {
-      var handler = function handler() {
-        return button.classList[action.state() ? 'add' : 'remove'](classes.selected);
-      };
-      addEventListener(content, 'keyup', handler);
-      addEventListener(content, 'mouseup', handler);
-      addEventListener(button, 'click', handler);
-    }
-
-    appendChild(actionbar, button);
-  });
-
-  if (settings.styleWithCSS) exec('styleWithCSS');
-  exec(defaultParagraphSeparatorString, defaultParagraphSeparator);
-
-  return settings.element;
-};
-
-var pell = { exec: exec, init: init };
-
-exports.exec = exec;
-exports.init = init;
-exports['default'] = pell;
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-})));
   </script>
   <script>
 this.OPENSSL_EVP_BytesToKey = (function script() {
@@ -755,7 +563,8 @@ this.openInputFileDialog = (function script() {
 
 }());
   </script>
-</head><body><h1>Portable Text Editor</h1><p>This page is a lightweight text editor with some useful features. You can use it to write text, put images or files. Then you can save the file and share it to your friends with or without encryption !</p><h2>How to use ?</h2><p>You can write by using your keyboard. By clicking on the icons in the top of this page, you can change the text to <b>bold</b>, <i>italic</i>, <u>underlined</u> or <strike>stroke</strike> text.</p><p>You can also put lines into title, into block quotes, into numbered list or ordered list, into code. You can also put an horizontal line like the one just below.<br></p><hr id="null"><p>Then you can create hyperlinks, embed photos/images and embed other type of files. The Save button allow to export the document in <a href="https://en.wikipedia.org/wiki/HTML">HTML</a> format (←open the link by pressing Ctrl and clicking it). The Load button allows to load a previously saved document (saved by this editor).</p><p>The lock icon allows to set a password to the document. Once set, clicking Save will export the document in a encrypted way. If you open it later, the same password will be required to view and edit it again.</p><p>Here is an embedded image →&nbsp;<img src="data:image/jpg;base64,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" alt="[small-clipart.jpg]"></p><p>Here is an embedded file →&nbsp;<a download="small-clipart.jpg" data-size="5353B" href="data:application/octet-stream;base64,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"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII="></a>&nbsp;(←just click it to download.)</p><p>Finally, you can print the document to PDF by pressing Ctrl P.</p><p>Enjoy !</p><h2>Things to know</h2><p></p><ul><li>File larger than 20 MB can freeze your computer depending on which system and browser you use.</li><li>You can click links in PDF version, however you can't download.</li><li>This is free software under <a href="http://www.wtfpl.net/">WTF v2</a> license (<a href="https://github.com/tnzw/tnzw.github.io/">tnzw</a>) and <a href="https://opensource.org/licenses/MIT">MIT</a> license (<a href="https://github.com/jaredreich/pell/blob/49a7f63b55fa8274180da89b6d293ff463caa2aa/LICENSE.md">pell</a>). See source code for more detail. Feel free to fork on <a href="https://github.com/tnzw/tnzw.github.io/">github</a> !<br></li></ul><p></p>
+</head><body><h1>Portable Text Editor</h1><p>This page is a lightweight text editor with some useful features. You can use it to write text, put images or files. Then you can save the file and share it to your friends with or without encryption !</p><h2>How to use ?</h2><p>You can write by using your keyboard. By clicking on the icons in the top of this page, you can change the text to <b>bold</b>, <i>italic</i>, <u>underlined</u> or <strike>stroke</strike> text.</p><p>You can also put lines into title, into block quotes, into numbered list or ordered list, into code. You can also put an horizontal line like the one just below.<br></p><hr id="null"><p>Then you can create hyperlinks, embed photos/images and embed other type of files by using the buttons or by drag&amp;drop. The Save button allow to export the document in <a href="https://en.wikipedia.org/wiki/HTML">HTML</a> format (←open the link by pressing Ctrl and clicking it). The Load button allows to load a previously saved document (saved by this editor).</p><p>The lock icon allows to set a password to the document. Once set, clicking Save will export the document in a encrypted way. If you open it later, the same password will be required to view and edit it again.</p><p>Here is an embedded image →&nbsp;<img src="data:image/jpg;base64,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" alt="[small-clipart.jpg]"></p><p>Here is an embedded file →&nbsp;<a download="small-clipart.jpg" data-size="5353B" href="data:image/jpg;base64,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"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII="></a>&nbsp;(←just click it to download.)</p><p>Finally, you can print the document to PDF by pressing Ctrl P.</p><p>Enjoy !</p><h2>Things to know</h2><p></p><ul><li>File larger than 20 MB can freeze your computer depending on which system and browser you use.</li><li>You can click links in PDF version, however you can't download.</li><li>This is free software under <a href="http://www.wtfpl.net/">WTF v2</a> license (<a href="https://github.com/tnzw/tnzw.github.io/">tnzw</a>). See source code for more detail. Feel free to fork on <a href="https://github.com/tnzw/tnzw.github.io/">github</a> !<br></li></ul><p></p>
+
 
 
 </body></html>
