@@ -2,7 +2,7 @@
 <html><head>
   <meta charset="UTF-8">
 
-  <!-- portabletexteditor.html Version 1.6.0
+  <!-- portabletexteditor.html Version 1.7.1
        Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
        This program is free software. It comes without any warranty, to
        the extent permitted by applicable law. You can redistribute it
@@ -11,6 +11,7 @@
        http://www.wtfpl.net/ for more details. -->
 
   <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
+  <title>Portable Text Editor</title>
   <style>body { margin: 0; padding: 0; }</style>
 
   <style>body > div.pte { border: 1px solid rgba(10, 10, 10, 0.1); box-sizing: border-box; }</style>
@@ -35,15 +36,22 @@
   <style>body > div.pte .pte-content blockquote { border-left: solid 1px blue; padding: 0 0 0 1em; margin: 1em 0 1em 0; }</style>
 
   <script>
-if (typeof nw !== "undefined" && typeof require !== "undefined")
-  document.title = `${require("path").basename(decodeURIComponent(location.pathname))} (${require("path").dirname(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname))})`;
-else
-  document.title = `${decodeURIComponent(location.pathname.replace(/^.*\//, ""))} (${decodeURIComponent(location.pathname.replace(/\/[^\/]*$/, ""))})`;
+var defaultContentEditable = true;
+
+var filename;
+if (typeof nw !== "undefined" && typeof require !== "undefined") {
+  filename = require("path").basename(decodeURIComponent(location.pathname));
+  document.title = `${filename} (${require("path").dirname(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname))})`;
+} else {
+  filename = decodeURIComponent(location.pathname.replace(/^.*\//, ""));
+  document.title = `${filename} (${decodeURIComponent(location.pathname.replace(/\/[^\/]*$/, ""))})`;
+}
 var version = (/Version (.*)/m).exec(document.head.innerHTML)[1],
     editor, topSize,
     fileInput,
     fileIconDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAOCAYAAAAbvf3sAAAABmJLR0QAAAAAAAD5Q7t/AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4wYMDBA2FfD3OAAAAGRJREFUKM/lkbsNwCAMRI+IKTyHa3Y+RqBmDWqP4HRI5IPT53Vn+VmyLpF0BJRS0gwk/Q2SPsZwkm5mMDMc0XURgaqiteYAYuEq5Wi51rrkraCqS+697wURuc0+/fB7IT+Vs+MEDss+LTCTQxkAAAAASUVORK5CYII=",
     formatMediatypes = {
+      "bmp": "image/bmp",
       "css": "text/css",
       "gif": "image/gif",
       "jpeg": "image/jpeg",
@@ -69,6 +77,7 @@ function focusHtml() { editor.focus(); }
 function updateHeaderSizeButton() { topSize.innerHTML = strSize(getHtml().length); return null; }
 updateHeaderSizeButton.delay = function (interval) { var f = updateHeaderSizeButton; if (f.timer) clearTimeout(f.timer); f.timer = setTimeout(_ => f.timer = f(), interval); };
 
+var $ = document.querySelectorAll.bind(document);
 function dce(tagName, attrs, nodes) { var e = document.createElement(tagName); for (let k of Object.keys(attrs || 0)) e.setAttribute(k, attrs[k]); if (typeof nodes === "string") e.innerHTML = nodes; else if (nodes) for (let c of nodes) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); return e; }
 function getATagParent(e) { while (e) { if (e.tagName === "A") return e; e = e.parentElement; } return null; }
 function getHTagParent(e) { while (e) { if (e.tagName && e.tagName.length === 2 && e.tagName[0] === "H") return e; e = e.parentElement; } return null; }
@@ -156,7 +165,7 @@ document.body.appendChild(element = dce("div", {class: "pte"}));
 
 bar = dce("div", {class: "pte-actionbar"});
 element.appendChild(bar);
-editor = dce("div", {class: "pte-content", contenteditable: "true"});
+editor = dce("div", {class: "pte-content", contenteditable: `${defaultContentEditable}`});
 element.appendChild(editor);
 
 editor.addEventListener("input", function () {
@@ -256,6 +265,7 @@ function appendButton(action) {
 }
 
 appendText(`Portable Text Editor ${version}`);
+if (defaultContentEditable) {
 //appendButton({name: "undo", inner: "&#9100;", title: "Undo", result: _ => exec("undo")});
 appendButton({name: "bold", inner: '<b>B</b>', title: 'Bold', state: function state() { return document.queryCommandState('bold'); }, result: function result() { return exec('bold'); }});
 appendButton({name: "italic", inner: '<i>I</i>', title: 'Italic', state: function state() { return document.queryCommandState('italic'); }, result: function result() { return exec('italic'); }});
@@ -298,14 +308,16 @@ appendButton({name: "link", inner: "🔗", title: "Link", result: _ => {
 //{name: "image", inner: '&#128247;', title: 'Image', result: function result() { var url = window.prompt('Enter the image URL'); if (url) exec('insertImage', url); }},
 appendButton({name: "image", inner: "📷", title: "Image", result: async function () { fileInput.setAttribute("multiple", "multiple"); await uploadImages(await openInputFileDialog(fileInput)); }});
 appendButton({name: "file", inner: `<img src="${fileIconDataURL}"/>`, title: "File", result: async function () { fileInput.setAttribute("multiple", "multiple"); await uploadFiles(await openInputFileDialog(fileInput)); }});
+}
 if (!(typeof nw !== "undefined" && typeof require !== "undefined"))
-appendButton({name: "load", inner: "L<sub>oad</sub>", title: "Load", result: async function () {
+appendButton({name: "load", inner: "L<sub>oad</sub>", title: "Load HTML file", result: async function () {
   if (typeof nw !== "undefined" && typeof require !== "undefined")
     fileInput.setAttribute("nwworkingdir", require("path").dirname(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname)));
   fileInput.removeAttribute("multiple");
   var files = await openInputFileDialog(fileInput), file, html;
   if (!files.length) return;
   file = files[0];
+  var name = file.name;
   if (modified && !confirm("Load document? Changes that you made may not be saved.")) return;
   if (file.size > 10 * 1024 * 1024 && !confirm(`Do you really want to upload this large file ? (${strSize(file.size)})`)) return;
   file = await readBlob(file, "text");
@@ -324,10 +336,11 @@ appendButton({name: "load", inner: "L<sub>oad</sub>", title: "Load", result: asy
   } else {
     setHtml(file.body.innerHTML);
   }
+  filename = name; document.title = filename;
   updateHeaderSizeButton();
   modified = false;
 }});
-appendButton({name: "save", inner: "S<sub>ave</sub>", title: "Save", result: async function () {
+appendButton({name: "save", inner: "S<sub>ave</sub>", title: "Save as HTML file", result: async function () {
   var data = "", a;
   if (pwd.value) {
     data = await encrypt(getHtml(), pwd.value);
@@ -342,7 +355,7 @@ appendButton({name: "save", inner: "S<sub>ave</sub>", title: "Save", result: asy
     require("fs").writeFileSync(decodeURIComponent(require("os").platform() === "win32" ? location.pathname.slice(1) : location.pathname), data);
     alert("Saved");
   } else {
-    a = dce("a", {tabIndex: -1, style: "display:none;", href: URL.createObjectURL(new Blob([data])), download: decodeURIComponent(location.pathname.replace(/^.*\//, "")) || "untitled.html"});
+    a = dce("a", {tabIndex: -1, style: "display:none;", href: URL.createObjectURL(new Blob([data])), download: filename || "untitled.html"});
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { document.body.removeChild(a); });
@@ -379,7 +392,7 @@ document.body.addEventListener("click", function (event) {
   if ((a = getATagParent(event.target)) && (a.download || event.ctrlKey) ||
       event.target.tagName === "INPUT" && event.target.type === "submit") {
     editor.contentEditable = false;
-    setTimeout(_ => editor.contentEditable = true, 100);
+    setTimeout(_ => editor.contentEditable = defaultContentEditable, 100);
   }
 }, {passive: true, capture: true});
 
@@ -387,9 +400,11 @@ document.body.addEventListener("click", function (event) {
 window.onbeforeunload = function () { if (modified) return "Reload site? Changes that you made may not be saved."; };
 
 // add some keyboard shortcuts
-editor.addEventListener("keydown", function (event) {
+window.addEventListener("keydown", function (event) {
   if (event.ctrlKey && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=save]").click(); return; }
   if (event.ctrlKey && event.key.toLowerCase() === "o") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=load]").click(); return; }
+}, {capture: true});
+editor.addEventListener("keydown", function (event) {
   if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "l") { event.preventDefault(); event.stopPropagation(); document.querySelector("button[name=link]").click(); return; }
 }, {capture: true});
 

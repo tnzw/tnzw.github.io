@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
+<!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
+<script>
+const banner=`Page.html Version 2.2.1
+Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
+This program is free software. It comes without any warranty, to
+the extent permitted by applicable law. You can redistribute it
+and/or modify it under the terms of the Do What The Fuck You Want
+To Public License, Version 2, as published by Sam Hocevar. See
+http://www.wtfpl.net/ for more details.`,
+  title=(/[^\s]+/).exec(banner)[1],
+  version=(/Version (.*)/m).exec(banner)[1],
+  license=banner.replace(/^.*\n/,"");
+
+const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,lang:"",pageformat:"A4",showtaglevels:0});
+const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
+const exportPreferenceKeys=["lang"];
+
+window.addEventListener('load',function(){
+  window.onerror=e=>alert(e);
+  function dce(tag,...args){var e=document.createElement(tag);for(let arg of args){if(Array.isArray(arg))for(let a of arg)e.appendChild(typeof a==="string"?document.createTextNode(a):a);else if(typeof arg==="string")e.innerHTML=arg;else if(arg&&typeof arg==="object")for(let k of Object.keys(arg))e.setAttribute(k,arg[k]);else if(typeof arg==="function")arg.call(e,e)}return e}
+  const div=dce.bind(0,"div"),span=dce.bind(0,"span"),button=dce.bind(0,"button"),select=dce.bind(0,"select"),option=dce.bind(0,"option");
+  window.app={
+    element:null,editor:null,
+    hasNwJs:typeof nw!=='undefined'&&typeof require!=='undefined',
+    editableExtMimeDict:{bmp:'image/bmp',css:'text/css',gif:'image/gif',htm:'text/html',html:'text/html',jpeg:'image/jpeg',jpg:'image/jpeg',js:'application/javascript',png:'image/png',svg:'image/svg+xml',svgz:'image/svg+xml',tiff:'image/tiff',txt:'text/plain',xhtml:'text/html'},
+    loadableExtMimeDict:{flac:'audio/flac',ogg:'audio/ogg',opus:'audio/ogg;codec=opus',pdf:'application/pdf',mp3:'audio/mpeg',mp4:'video/mp4',wav:'audio/wav',webm:'video/webm'},//zip:'application/zip'
+    state:{},update(m){let frz=Object.freeze,o={},n={},u={};if('password' in m){this.crypto.setPassword(m.password);if((/^https?:\/\//).test(location.href)){m=Object.assign({},m,{password:!!m.password})}}for(let k of Object.keys(m||0))if(m[k]!==this.state[k]){o[k]=this.state[k];this.state[k]=n[k]=m[k];u[k]=1}if(Object.keys(n).length){let ev=frz({type:'appupdate',target:this,updates:frz(n),updated:frz(o),isupdated:frz(u)});for(let el of this.element.querySelectorAll('[onappupdate]'))new Function('event',el.getAttribute('onappupdate')).call(el,ev)}},
+    promptForUpdate(){let p=prompt('Prompt');if(p){let k=(/^\s*([^\s]+)/).exec(p),v=(/^\s*[^\s]+\s(.*)$/).exec(p);if(k){app.update({[k[1]]:v&&v[1]})}}},
+    display(el,yes){el.classList[yes?'remove':'add']('nodisplay')},
+    escapeHTML(text){return `${text}`.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')},
+    formatOf(name){return `${name}`.replace(/^..*\./,'').toLowerCase()},
+    strSize(size){var sizes=['B','KB','MB','GB','PB'],i=0,l=sizes.length-1;while(i<l&&size>9999){i++;size=(size/1000)|0;}return size+sizes[i]},
+    updateAppSize:function updateAppSize(delay){clearTimeout(updateAppSize._inputtimer);updateAppSize._inputtimer=setTimeout(_=>app.update({appsize:document.head.outerHTML.length+app.editor.innerHTML.length}),delay!==undefined?delay:500)},
+    base64(data){if(typeof data==='string')data=new TextEncoder().encode(data);else data=new Uint8Array(data);let bs='';for(let b of data)bs+=String.fromCharCode(b);return btoa(bs)},
+    unbase64(data){if(ArrayBuffer.isView(data))data=new TextDecoder().decode(new Uint8Array(data));else data=`${data}`;let bs=atob(data);data=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)data[i]=bs.charCodeAt(i);return data},
+    openFile(opt,fn){var f=this.fileElement;opt=opt||0;f[(opt.multiple?'set':'remove')+'Attribute']('multiple','multiple');if(this.hasNwJs)f[(this.state.filepath?'set':'remove')+'Attribute']('nwworkingdir',require('path').dirname(this.state.filepath));f[(opt.nwsaveas?'set':'remove')+'Attribute']('nwsaveas',this.state.filename);f.onchange=fn;f.click()},
+    downloadData(data,as){let a=this.downloadElement;a.href=window.URL.createObjectURL(new Blob([data]));a.download=as;setTimeout(_=>a.href='#',100);a.click()},
+    clearFile(){if(this.state.modified&&!confirm('New document? Changes that you made may not be saved.'))return;this.editor.innerHTML='<p><br></p>';app.update({filepath:undefined,filename:"untitled.html",pageformat:"A4",contenteditable:1,modified:0});this.editor.focus()},
+    async loadFile(file){if(file===null)return;
+      if(file===undefined)return this.openFile({},e=>this.loadFile(e.target.files[0]||null));
+      if(this.state.modified)if(!confirm('Load document? Changes that you made may not be saved.'))return;
+      if(file.size>10*1024*1024)if(!confirm(`Do you really want to upload this large file ? (${this.strSize(file.size)})`))return;
+      var text,data,dom,ext,mime;
+      ext=this.formatOf(file.name);
+      if(mime=this.editableExtMimeDict[ext]){
+        if(mime==='text/html'){try{dom=new DOMParser().parseFromString((text||(text=await this.readBlob(file,'text'))),'text/html')}catch(_){}}
+        if(dom){this.editor.innerHTML=dom.body.innerHTML;setTimeout(_=>{var i=document.body.querySelector('[autofocus]');if(i)i.focus()})}
+        else if(mime.startsWith('text/')||mime==='application/javascript')this.editor.innerHTML='<p>'+this.escapeHTML((text||(text=await this.readBlob(file,'text')))).replace(/(\n+)\n/g,(m,n)=>'<br>'.repeat(n.length)+'</p><p>').replace(/\n/g,'<br>')+'</p>';
+        else if(mime.startsWith('image/'))this.editor.innerHTML='<p><img src="data:'+mime+';base64,'+this.base64((data||(data=await this.readBlob(file,'arraybuffer'))))+'"></p><p><br></p>';
+        return this.update({filepath:file.path,filename:file.name,modified:0,pageformat:"A4"});
+      }
+      if (mime=this.loadableExtMimeDict[ext]) {
+        this.editor.innerHTML=`<form action="#" onsubmit="event.preventDefault();let unbase64=(d)=>{let bs=atob(d);d=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)d[i]=bs.charCodeAt(i);return d},data=unbase64(this.querySelector('iframe').src.split(',')[1]),a=document.createElement('a');a.download=(this.querySelector('[name=filename]')||0).value||'untitled';a.href=window.URL.createObjectURL(new Blob([data]));a.click()">
+          <div style="display:flex"><input style="flex-grow:2" name="filename" value="${this.escapeHTML(file.name)}" placeholder="untitled"><input type="submit" value="Download" accesskey="s"></div>
+          <iframe style="width:100%;height:calc(100vh - 3cm)" src="data:${mime};base64,${this.base64(data||(data=await this.readBlob(file,'arraybuffer')))}"></iframe>
+        </form>`;
+        return this.update({contenteditable:0,filepath:file.path,filename:file.name,modified:0,pageformat:"fullwidth"});
+      }
+      alert('Cannot open file: ' + file.name);
+    },
+    async saveFile(as,opt){if(as!==undefined)if(!as)return;var data;
+      if(as===undefined){if(this.hasNwJs)return this.openFile({nwsaveas:1},e=>this.saveFile(e.target.files[0].path,opt));return this.saveFile(prompt(opt&&opt.export?'Export as…':'Save as…',this.state.filename),opt)}
+      let oldtitle=document.title;document.title='Page.html';
+      if(!this.hasNwJs)as=as.replace(/\.html?$/i,'')+'.html';
+      if(opt&&opt.export){if(this.state.password)
+        data='<!DOCTYPE html>\n<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"></head><body onload="window.app={update(d){if(d.lang)document.children[0].lang=d.lang;}}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(exportPreferenceKeys.reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
+      else
+        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"><title>'+(this.hasNwJs?require('path').basename(as):as)+'</title></head><body>'+this.editor.innerHTML+'</body></html>';
+      }else if(this.state.password)
+        data='<!DOCTYPE html>\n<html>'+document.head.outerHTML+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(otherPreferences))+');document.body.querySelector(\'[autofocus]\').focus()}catch(_){}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
+      else
+        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'>'+document.head.outerHTML+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))+')}catch(_){}">'+this.editor.innerHTML+'</body></html>';
+      document.title=oldtitle;
+      if(this.hasNwJs){
+        require('fs').writeFileSync(as,data);alert('Saved.');
+        return app.update({modified:0,filepath:as,filename:require('path').basename(as)});
+      }
+      this.downloadData(data,as);
+      return app.update({modified:0,filename:as});
+    },
+    readBlob(blob, as) {
+      var d={},fr=new FileReader();
+      d.p=new Promise((r,j)=>{d.r=r;d.j=j});
+      fr.onload=e=>d.r(e.target.result);
+      fr.onerror=fr.onabort=e=>d.j(e.target.error);
+      d.p.cancel=_=>fr.abort();
+      switch (as && as.toLowerCase()) {
+        case 'arraybuffer': fr.readAsArrayBuffer(blob); break;
+        case 'text': case 'string': case undefined: fr.readAsText(blob); break;
+        case 'dataurl': fr.readAsDataURL(blob); break;
+        case 'binarystring': if (fr.readAsBinaryString) { fr.readAsBinaryString(blob); break; }
+        default: throw new Error('unhandled `as = ' + as + '`');
+      }
+      return d.p;
+    },
+    crypto:(function lib() {
+      var _password='';
+      /* Encryption inspired by openssl aes-256-cbc. */
+      async function OPENSSL_EVP_BytesToKey(hash, nhash, salt, password, count, key, ksize, iv, vsize) {
+        var nkey = ksize, niv = vsize, addmd = 0, i = 1, ki = 0, vi = 0, update = null, digest = null;
+        for (;;) { update = []; if (addmd++) update.push.apply(update, digest); update.push.apply(update, password); if (salt) update.push.apply(update, salt); digest = await hash(update);
+          for (i = 1; i < count; i += 1) digest = await hash(digest); i = 0; if (nkey) { for (;;) { if (nkey === 0) if (i === nhash) break; if (key) key[ki++] = digest[i]; nkey--; i++; } }
+          if (niv && (i !== nhash)) { for (;;) { if (niv === 0) break; if (i === nhash) break; if (iv) iv[vi++] = digest[i]; niv--; i++; } } if (nkey === 0 && niv === 0) break; }
+        return ksize;
+      }
+      async function hash(data) { if (typeof data === 'string') data = new TextEncoder().encode(data); return new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(data))); }
+      async function encrypt(data,password) {
+        if(password===undefined)password=_password;
+        if(typeof password==='string')password=new TextEncoder().encode(password);
+        if(typeof data==='string')data=new TextEncoder().encode(data);
+        var salt = crypto.getRandomValues(new Uint8Array(8)), iv = new Uint8Array(16), key = new Uint8Array(32);
+        await OPENSSL_EVP_BytesToKey(hash, 32, salt, password, 1, key, 32, iv, 16);
+        key = await crypto.subtle.importKey('raw', key, 'AES-CBC', true, ['encrypt', 'decrypt']);
+        data = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-CBC', iv: iv}, key, data));
+        return Uint8Array.from((function* (aa) { for (let a of aa) for (let v of a) yield v; })([salt, data]));
+      }
+      async function decrypt(data,password) {
+        if(password===undefined)password=_password;
+        if(typeof password==='string')password=new TextEncoder().encode(password);
+        data = new Uint8Array(data);
+        var salt = data.subarray(0, 8), iv = new Uint8Array(16), key = new Uint8Array(32);
+        await OPENSSL_EVP_BytesToKey(hash, 32, salt, password, 1, key, 32, iv, 16);
+        key = await crypto.subtle.importKey('raw', key, 'AES-CBC', true, ['encrypt', 'decrypt']);
+        return new Uint8Array(await crypto.subtle.decrypt({name: 'AES-CBC', iv: iv}, key, data.subarray(8)));
+      }
+      async function magic(data){return btoa(String.fromCharCode(...await hash(data))).slice(0,3)}
+      function setPassword(password){_password=password}
+      return Object.freeze({OPENSSL_EVP_BytesToKey,hash,magic,encrypt,decrypt,setPassword,lib});
+    })(),
+    mkDecryptHTML(datacipheredhtml,preferencescipheredhtml){
+      return `🔒 <input type=password placeholder=Password autofocus tabindex=1
+onfocus="if(this.lib)return;this.lib=(${this.escapeHTML(`${this.crypto.lib}`)})();if(window.app&&app.state.password&&typeof app.state.password==='string'){this.value=app.state.password;this.parentNode.querySelector('button').click();setTimeout(_=>this.value='')}"
+oninput="let m=this.nextElementSibling;m.textContent='...';clearTimeout(this.timer);this.timer=setTimeout(_=>this.lib.magic(this.value).then(t=>m.textContent=t),1000)"
+onkeydown="if(event.code==='Enter'){this.parentNode.querySelector('button').click();setTimeout(_=>this.value='')}">
+<code>&nbsp;&nbsp;&nbsp;</code>
+<button data-ciphered="${datacipheredhtml}" data-ciphered2="${preferencescipheredhtml}"
+onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;Promise.all([i.lib.decrypt(new Uint8Array([].map.call(atob(this.dataset.ciphered),c=>c.charCodeAt(0))),v),i.lib.decrypt(new Uint8Array([].map.call(atob(this.dataset.ciphered2),c=>c.charCodeAt(0))),v)]).then(([d,p,h])=>{this.parentNode.innerHTML=new TextDecoder().decode(d);try{app.update(JSON.parse(new TextDecoder().decode(p)))}catch(_){};try{app.update({password:v})}catch(_){}});">✓</button>`;
+    },
+    mkSourceEditionHTML(source){
+      return `<form action="#" onsubmit="event.preventDefault();this.parentNode.innerHTML=this.querySelector('textarea').value"><div>Editing source <input type="submit" value="Set source" accesskey="s"></div><textarea style="width:100%;height:calc(100vh - 5cm)">${this.escapeHTML(source)}</textarea></form>`;
+    }
+  };
+  app.element=div({
+    name:"app",style:"display:flex;flex-direction:column",
+    onchange:"let t=event.target;if(t.tagName==='SELECT')if(/^[_a-z0-9]+$/i.test(t.value))for(let el of t.querySelectorAll(`option[onselect][value=${t.value}]`))new Function(el.getAttribute('onselect')).call(el)",
+    onmouseup:"clearTimeout(this._mouseuptimer);this._mouseupelement=event.target;this._mouseuptimer=setTimeout(_=>this._mouseupelement=null,50);",
+    onclick:"let t=event.target,p;if(t.tagName==='OPTION'&&t.value!==undefined&&(p=t.parentNode).tagName==='SELECT'&&!this._mouseupelement&&p.value!==t.value){p.value=t.value;p.dispatchEvent(new Event('change',{bubbles:true}))}",
+    oninput:"app.updateAppSize()",
+    ondragover:"event.preventDefault()",ondrop:"event.preventDefault()"
+  },[
+    div({class:"noprint",style:"opacity:0;position:fixed;width:1px;height:1px;top:0;left:0;z-index:-1"},[
+      app.downloadElement=dce("a",{download:"untitled.html",href:"#",tabindex:"-1"},[" "]),
+      app.fileElement=dce("input",{type:"file",tabindex:"-1"})
+    ]),
+    div({class:"nodisplay noprint",style:"position:fixed;width:100vw;height:100vh;background-color:rgba(0,0,0,0.2);z-index:9999;top:0;left:0;display:flex;flex-direction:column;justify-content:center",onappupdate:"let u=event.updates;if('appshowabout' in u)event.target.display(this,u.appshowabout)"},[
+      div({style:"background-color:#fff;align-self:center;border:1px solid #000;padding:1em"},[
+        dce("p",[dce("b",{onappupdate:"let u=event.updates;if('title' in u)this.textContent=u.title"},"Page.html")," ",dce("sub",{onappupdate:"let u=event.updates;if('version' in u)this.textContent=u.version"},"-.-.-")]),
+        dce("p",{onappupdate:"let u=event.updates;if('license' in u)this.innerHTML=event.target.escapeHTML(u.license).replace(/\\n/g,'<br>')"},"LICENSE"),
+        dce("p",["Fork me on ",dce("a",{href:"https://github.com/tnzw/tnzw.github.io/blob/master/app/page.html",target:"_blank"},"github"),"!"]),
+        div([button({onappupdate:"if(event.updates.appshowabout)this.focus()",onclick:"app.update({appshowabout:0})",onescape:"(this.offsetParent!==null)&&this.click()"},"Ok")])
+      ])
+    ]),
+    div({class:"noprint",style:"position:absolute"},[dce("sup",{onappupdate:"let u=event.updates;if('title' in u)this.textContent=u.title"},"Page.html")]),
+    div({class:"noprint",style:"position:absolute;right:0.5em"},[dce("sup",{onappupdate:"let u=event.updates;if('version' in u)this.textContent=u.version"},"-.-.-")]),
+    div({name:"bars",class:"noprint",style:"position:sticky;top:0;display:flex;flex-direction:column",ondragover:"event.preventDefault()",ondrop:"if(event.dataTransfer.files.length){event.preventDefault();app.loadFile(event.dataTransfer.files[0])}"},[
+      div({style:"align-self:center;width:21cm",onappupdate:"let u=event.updates;if('mainbar' in u)event.target.display(this,u.mainbar==='title')"},[
+        span({style:"text-overflow:ellipsis;white-space:nowrap;overflow:hidden;flex-grow:2;font-weight:bold",
+              onappupdate:"let p,u=event.updates;if('filename' in u)document.title=this.textContent=u.filename;if(event.target.hasNwJs)if(p=u.filepath){p=require('path').parse(p);document.title=`${p.base} (${p.dir})`}"},"TITLE"),
+        span({class:"nodisplay",placeholder:"Password",onappupdate:"let u=event.updates;if('password' in u)event.target.display(this,u.password)"},"🔒"),
+        span([
+          button({accesskey:"e",onclick:"app.update({contenteditable:!app.state.contenteditable})",
+                  onappupdate:"let u=event.updates;if('viewer' in u)event.target.display(this,u.viewer==='contenteditable');if('contenteditable' in u)this.textContent=u.contenteditable?'👁':'✏'"},"👁"),
+          button({onclick:"app.saveFile(app.hasNwJs?app.state.filepath:app.state.filename);if(!event.isTrusted)app.editor.focus()",ctrlkey:"s"},app.hasNwJs?"💾":"<u>⬇</u>"),
+          button({onclick:"app.loadFile()",ctrlkey:"o"},"📂"),
+          button({onclick:"app.update({mainbar:'menu'})",onescape:"if(document.activeElement!==this)this.focus();else app.editor.focus()"},"<b>⋮</b>")
+        ])
+      ]),
+      div({class:"nodisplay",style:"align-self:center;width:21cm",onappupdate:"let u=event.updates;if('mainbar' in u)event.target.display(this,u.mainbar==='menu')"},[
+        span({style:"flex-grow:2"},"Menu"),
+        span({style:"text-overflow:ellipsis;white-space:nowrap;overflow:hidden;font-size:70%",onappupdate:"let u=event.updates;if(u.appinit)app.updateAppSize();if('appsize' in u)this.textContent='~'+event.target.strSize(u.appsize)"},""),
+        span([select([
+          option({value:"",selected:"selected"},"File"),
+          option({value:"s",ctrlshiftkey:"s",onselect:"this.parentNode.value='';app.saveFile();app.update({mainbar:'title'})"},"Save As…"),
+          option({value:"e",ctrlkey:"e",onselect:"this.parentNode.value='';app.saveFile(undefined,{export:1});app.update({mainbar:'title'})"},"Export As…"),
+          option({value:"p",accesskey:"p",onselect:"this.parentNode.value='';app.update({apppasswordbar:'show',mainbar:'title'})"},"Password…"),
+          option({value:"n",onselect:"this.parentNode.value='';app.clearFile();app.update({mainbar:'title'})"},"Clear")
+        ]),select([
+          option({value:"",selected:"selected"},"View"),
+          option({value:"t",onselect:"this.parentNode.value='';app.update({showtaglevels:!app.state.showtaglevels,mainbar:'title'})",onappupdate:"let u=event.updates;if('showtaglevels' in u)this.textContent='Tags '+(u.showtaglevels?'☑':'☐')"},"Tags ☐"),
+          option({value:"s",onselect:"this.parentNode.value='';app.editor.innerHTML=app.mkSourceEditionHTML(app.editor.innerHTML);app.update({contenteditable:0,mainbar:'title'})"},"Source"),
+        ]),select([
+          option({value:"",selected:"selected"},"?"),
+          option({value:"a",onselect:"this.parentNode.value='';app.update({appshowabout:1,mainbar:'title'})"},"About…"),
+          option({value:"d",onselect:"this.parentNode.value='';alert(this.getMessageRandomly());app.update({mainbar:'title'})"},"Do you know…?",e=>e.getMessageRandomly=_=>{let a=[
+            `Pressing 'Escape' allow to get the focus to the page. It can also close some activated menus.`,
+            `If a password is set, downloading will return an encrypted version of your content. You can later open it, as usual, except that a password is required to see the actual content.`,
+            `You can open a Page.html password protected document with this application.`,
+            `Pressing Ctrl-S allows to download the document content.`,
+            `Pressing Ctrl-Shift-S allows to download the document content with a specific file name.`,
+            `Pressing Ctrl-O allows to open a document.`,
+            `Pressing Ctrl-E allows to export the document content without the edition tools (read only).`,
+            `You can insert link by pressing Ctrl-Shift-L.`,
+            `You can set a password by pressing Alt-Shift-P on most browsers.`,
+            `You can drag&drop files in the editable page. Pressing Shift simultaneously will store dragged image as binary file.`,
+            `You can drag&drop a file in the top bars to open it.`,
+            `You can open any html page with this application. Some web magic may not work because you want to edit it.`,
+            `You can display tag levels.`,
+            `You can print the document (send to printer or create PDF).`,
+            `You can check or fill forms and save the document.`,
+            `This application is free software (free as in free speech) ;)`
+          ];return a[(Math.random()*a.length)|0]})
+        ])]),
+        span([button({onclick:"app.update({mainbar:'title'})",onescape:"(this.offsetParent!==null)&&this.click()"},"<b>&lt;</b>")])
+      ]),
+      div({class:"nodisplay",style:"align-self:center",onappupdate:"let u=event.updates;if('apppasswordbar' in u)event.target.display(this,u.apppasswordbar==='show')"},[span([
+        "🔒 ",
+        dce("input",{type:"password",
+                     oninput:"let m=this.nextElementSibling;m.textContent='...';clearTimeout(this.timer);let v=this.value;this.timer=setTimeout(_=>app.crypto.magic(v).then(t=>m.textContent=t),1000)",
+                     onkeydown:"if(event.key==='Enter'){let p=this.value;this.value='';app.update({password:p,apppasswordbar:''})}else if(event.key==='Escape'){this.value='';app.update({apppasswordbar:''})}",
+                     onappupdate:"let u=event.updates;if('apppasswordbar' in u)if(u.apppasswordbar==='show')this.focus();else this.value=''"}),
+        dce("code","&nbsp;&nbsp;&nbsp;"),
+        button({onclick:"let i=this.previousElementSibling.previousElementSibling,p=i.value;i.value='';app.update({password:p,apppasswordbar:''})"},"✓")
+      ])]),
+      div({style:"align-self:center;width:21cm",onappupdate:"let u=event.updates;if('viewer' in u)event.target.display(this,u.viewer==='contenteditable');if('contenteditable' in u)event.target.display(this,u.contenteditable)"},[
+        span({class:"largewindowonly"},[
+          button({ctrlkey:"b",onclick:"app.editor.ctl('bold')"},"<b>B</b>"),
+          button({ctrlkey:"i",onclick:"app.editor.ctl('italic')"},"<i>I</i>"),
+          button({ctrlkey:"u",onclick:"app.editor.ctl('underline')"},"<u>U</u>"),
+          button({onclick:"app.editor.ctl('strikeThrough')"},"<s>S</s>")
+        ]),
+        span({class:"smallwindowonly"},[select([
+          option({value:"",selected:"selected"},"Deco."),
+          option({value:"b",onselect:"this.parentNode.value='';app.editor.ctl('bold')"},"Bold"),
+          option({value:"i",onselect:"this.parentNode.value='';app.editor.ctl('italic')"},"Italic"),
+          option({value:"u",onselect:"this.parentNode.value='';app.editor.ctl('underline')"},"Underline"),
+          option({value:"s",onselect:"this.parentNode.value='';app.editor.ctl('strikeThrough')"},"Strike")
+        ])]),
+        span({class:"largewindowonly"},[
+          button({onclick:"app.editor.ctl('formatBlock','p')"},"¶"),
+          button({onclick:"app.editor.ctlHBig()"},"<b>H</b><sub>1</sub>"),
+          button({onclick:"app.editor.ctlHSmall()"},"<b>H</b><sub>2</sub>"),
+          button({onclick:"app.editor.ctlQuote()"},"«»"),
+          button({onclick:"app.editor.ctl('formatBlock','<pre>')"},"[]")
+        ]),
+        span({class:"smallwindowonly"},[select([
+          option({value:"",selected:"selected"},"Format."),
+          option({value:"p",onselect:"this.parentNode.value='';app.editor.ctl('formatBlock','p')"},"Normal"),
+          option({value:"h1",onselect:"this.parentNode.value='';app.editor.ctlHBig()"},"Title +"),
+          option({value:"h2",onselect:"this.parentNode.value='';app.editor.ctlHSmall()"},"Title -"),
+          option({value:"q",onselect:"this.parentNode.value='';app.editor.ctlQuote()"},"Quote"),
+          option({value:"c",onselect:"this.parentNode.value='';app.editor.ctl('formatBlock','<pre>')"},"Code")
+        ])]),
+        span({class:"largewindowonly"},[
+          button({onclick:"app.editor.ctl('insertOrderedList')"},"#"),
+          button({onclick:"app.editor.ctl('insertUnorderedList')"},"•")
+        ]),
+        span({class:"smallwindowonly"},[select([
+          option({value:"",selected:"selected"},"List."),
+          option({value:"n",onselect:"this.parentNode.value='';app.editor.ctl('insertOrderedList')"},"Num."),
+          option({value:"b",onselect:"this.parentNode.value='';app.editor.ctl('insertUnorderedList')"},"Bullet")
+        ])]),
+        span({style:"flex-grow:2"},[select([
+          option({value:"",selected:"selected"},"…"),
+          option({value:"l",ctrlshiftkey:"l",onselect:"this.parentNode.value='';app.editor.ctlInsertLink()"},"Insert link…"),
+          option({value:"i",onselect:"this.parentNode.value='';app.editor.ctlInsertImage()"},"Insert image…"),
+          option({value:"t",onselect:"this.parentNode.value='';app.editor.ctlInsertFile()"},"Insert file…"),
+          option({value:"u",onselect:"this.parentNode.value='';app.editor.ctl('undo')"},"Undo"),
+          option({value:"r",onselect:"this.parentNode.value='';app.editor.ctl('redo')"},"Redo"),
+          option({value:"s",onselect:"this.parentNode.value='';app.update({spellcheck:!app.state.spellcheck})",onappupdate:"let u=event.updates;if('spellcheck' in u)this.textContent='Spellcheck'+(u.spellcheck?'☑':'☐')"},"Spellcheck ☑")
+        ])])
+      ])
+    ]),
+    app.editor=div({
+      name:"editor",contenteditable:"true",
+      onappupdate:`let u=event.updates;
+        if('spellcheck' in u)this.setAttribute('spellcheck',!!u.spellcheck);
+        if('contenteditable' in u)this.setAttribute('contenteditable',!!u.contenteditable);
+        if('pageformat' in u){this.classList.remove('pageformat-'+event.updated.pageformat);this.classList.add('pageformat-'+u.pageformat)}
+        if('lang' in u)document.children[0].lang=u.lang;
+        if('showtaglevels' in u)this.classList[u.showtaglevels?'add':'remove']('showtaglevels');`,
+      onfocus:"this.cmd('defaultParagraphSeparator','p')",
+      oninput:"if(this.contentEditable=='true')app.update({modified:1})",onblur:"for(let e of this.querySelectorAll('h1,h2,h3,h4,h5,h6'))e.id=e.textContent",
+      onclick:"for(let a of this.iterParentElements(event.target,1))if(a.tagName==='A'&&!a.download&&!a.target&&a.href.replace(/#.*/,'')!==location.href.replace(/#.*/,'')){a.target='_blank';setTimeout(_=>a.removeAttribute('target'))}",
+      onkeydown:"if(this.contentEditable=='true'&&event.key==='Tab'){event.preventDefault();this.cmd(event.shiftKey?'outdent':'indent')}",
+      onchange:"app.update({modified:1});let t=event.target;if(t.tagName==='INPUT'){if(({checkbox:1,radio:1})[t.type])t[(t.checked?'set':'remove')+'Attribute']('checked','true');else if(t.type!=='password'){t.setAttribute('value',t.value)}}else if(t.tagName==='TEXTAREA'){t.innerHTML=t.value}",
+      ondrop:`event.preventDefault();event.stopPropagation();
+        let eot=this.getEventExplicitOriginalTarget(event),e;
+        if(eot.nodeType===3)this.selectNodeStart(eot,event.rangeOffset);
+        else if(eot===this&&(e=this.selectTopAfterElementFromPagePosition(this,this.scrollLeft+event.clientX,this.scrollTop+event.clientY)))this.selectNodeStart(e,0,'Before');
+        else this.selectNodeEnd(eot);
+        if(event.shiftKey)return this.ctlInsertFile(event.dataTransfer.files);
+        for(let file of event.dataTransfer.files)
+          if (!(app.editableExtMimeDict[app.formatOf(file.name)]||'').startsWith('image/'))
+            return this.ctlInsertFile(event.dataTransfer.files);
+        this.ctlInsertImage(event.dataTransfer.files)`
+    },function(){
+      Object.assign(this,{
+        cmd(k,v){return document.execCommand(k,0,v)},
+        ctl(k,v){if(this.contentEditable=='true'){document.execCommand(k,0,v);this.focus()}},
+        ctlHBig(){if(this.contentEditable!='true')return;var h=this.getCursorHNode(),hn=1;if(h)hn=(h.tagName.slice(1)|0)-1;if(hn<1)hn=1;this.ctl('formatBlock',`<h${hn}>`)},
+        ctlHSmall(){if(this.contentEditable!='true')return;var h=this.getCursorHNode(),hn=2;if(h)hn=(h.tagName.slice(1)|0)+1;this.ctl('formatBlock',`<h${hn}>`)},
+        ctlQuote(){if(this.contentEditable!='true')return;
+          var s=window.getSelection(),r=s.getRangeAt(0);
+          for(let bq of this.iterParentElements(r.commonAncestorContainer,1))
+            if (bq.tagName==='BLOCKQUOTE') {
+              this.selectNode(bq);
+              return this.ctl('insertHTML',bq.innerHTML);
+            }
+            this.ctl('formatBlock','<blockquote>');
+        },
+        ctlInsertLink(){if(this.contentEditable!='true')return;
+          var a=this.find(this.iterSelectionNodes(),el=>el.tagName==='A')||this.getCursorANode(),
+            url=prompt('Enter the link URL',a&&a.getAttribute('href')||'');
+          if(url!==null){
+            if(a&&url)a.setAttribute('href',url);
+            else if(url)this.cmd('createLink',url);
+            else{if(a)this.selectNodeContents(a);this.cmd('unlink')}
+          }
+          this.focus();
+        },
+        async ctlInsertImage(files){if(this.contentEditable!='true'||files===null)return;
+          if(files===undefined)return app.openFile({multiple:1},e=>this.ctlInsertImage(e.target.files||null));
+          this.focus();
+          let ai=0,aa;files=[].filter.call(files,file=>!(file.size>10*1024*1024&&!confirm(`Do you really want to upload this large image ? [${app.strSize(file.size)} ${file.name}]`)));
+          if(!files.length)return;
+          this.cmd('insertHTML','<img id=img-upload src=# />'.repeat(files.length));
+          await null;aa=Array.from(this.querySelectorAll('img#img-upload'));
+          for(let a of aa)a.removeAttribute('id');
+          for(let file of files){
+            let img=aa[ai++],size=0,href=app.editableExtMimeDict[app.formatOf(file.name)]||'';
+            if(href)href=`data:${href};base64,`;
+            else{href=app.formatOf(file.name);href=href?`data:image/${href};base64,`:'data:application/octet-stream;base64,'}
+            let name=file.name||'untitled.img';
+            img.alt=`📷[0 ${name}]`;
+            img.setAttribute('uploading',true);
+            while(size<file.size){
+              let part=file.slice(size,size+(9*1024));
+              href+=btoa(await app.readBlob(part,'binarystring'));
+              size+=part.size;
+              img.alt=`📷[${app.strSize(size)} ${name}]`;
+            }
+            img.setAttribute('src',href);
+            img.alt=`📷[${name}]`;
+            img.removeAttribute('uploading');
+            try{this.dispatchEvent(new Event('input',{bubbles:true}))}catch(_){}
+          }
+        },
+        async ctlInsertFile(files){if(this.contentEditable!='true'||files===null)return;
+          if(files===undefined)return app.openFile({multiple:1},e=>this.ctlInsertFile(e.target.files||null));
+          this.focus();
+          let ai=0,aa;files=[].filter.call(files,file=>!(file.size>10*1024*1024&&!confirm(`Do you really want to upload this large file ? [${app.strSize(file.size)} ${file.name}]`)));
+          if(!files.length)return;
+          this.cmd('insertHTML','<a id=a-upload>🗎</a>&nbsp;'.repeat(files.length));
+          await null;aa=Array.from(this.querySelectorAll('a#a-upload'));
+          for(let a of aa)a.removeAttribute('id');
+          for(let file of files){
+            let a=aa[ai++],size=0,href=`data:${app.editableExtMimeDict[app.formatOf(file.name)]||'application/octet-stream'};base64,`;
+            a.download=file.name||'untitled';
+            a.setAttribute('data-size','0B');
+            a.setAttribute('uploading',true);
+            while(size<file.size){
+              let part=file.slice(size,size+(9*1024));
+              href+=btoa(await app.readBlob(part,'binarystring'));
+              size+=part.size;
+              a.setAttribute('data-size',app.strSize(size));
+            }
+            a.setAttribute('href',href);
+            a.removeAttribute('uploading');
+          }
+        },
+        getCursorNode(){return window.getSelection().focusNode},
+        getCursorANode(e){for(e of this.iterParentElements(e||this.getCursorNode(),1))if(e.tagName==='A')return e;return null},
+        getCursorHNode(e){for(e of this.iterParentElements(e||this.getCursorNode(),1))if((/^h[0-9]+$/i).test(e.tagName))return e;return null},
+        selectNode(el){var s,r=document.createRange();r.selectNode(el);s=window.getSelection();s.removeAllRanges();s.addRange(r)},
+        selectNodeStart(el,offset,correction){var s,r=document.createRange();r['setStart'+(correction||'')](el,offset|0);r.collapse(true);s=window.getSelection();s.removeAllRanges();s.addRange(r)},
+        selectNodeEnd(el){var s,r=document.createRange();r.selectNodeContents(el);r.collapse(false);s=window.getSelection();s.removeAllRanges();s.addRange(r)},
+        selectNodeContents(el){var s,r=document.createRange();r.selectNodeContents(el);s=window.getSelection();s.removeAllRanges();s.addRange(r)},
+        selectTopAfterElementFromPagePosition(el,x,y){for(let e of el.childNodes)if(e.offsetTop>y)return e;return null},
+        getEventExplicitOriginalTarget(e){return e.explicitOriginalTarget||(e.path&&e.path[0])||null},
+        find(it,cond,def){for(let o of it)if(cond(o))return o;return def},
+        *iterproperty(prop,o,self){if(self)yield o;o=o[prop];while(o!==null&&o!==undefined){yield o;o=o[prop]}},
+        *iterParentElements(el,self){yield*this.iterproperty('parentNode',el,self)},
+        *iterAllElementNextSibling(el,self){yield*this.iterproperty('nextSibling',el,self)},
+        *iterElementTree(el,self){if(self)yield el;for(let c of el.childNodes)yield*this.iterElementTree(c,1)},
+        *iterElementBetween(el1,el2){for(let el of this.iterParentElements(el1,1)){yield el;if(el===el2)return;for(let el3 of this.iterAllElementNextSibling(el))for(let el4 of this.iterElementTree(el3,1)){yield el4;if(el4===el2)return}}},
+        *iterSelectionNodes(i){var s=window.getSelection(),f=r=>this.iterElementBetween(r.startContainer,r.endContainer);if(i!==undefined)yield*f(s.getRangeAt(i|0));else for(i=0;i<s.rangeCount;i++)yield*f(s.getRangeAt(i))}
+      });
+    })
+  ]);
+  Object.freeze(app);
+
+  app.element.handleEvent=function self(event){
+    if(!this.parentNode){self.unbounds.forEach(f=>f(this));return}
+    if(event.ctrlKey&&!event.shiftKey&&event.key){let f,k=event.key!=='"'?event.key:'\\"';for(let el of document.querySelectorAll(`[ctrlkey="${k.toLowerCase()}"]`)){el.focus();el.click();f=1}if(f){event.preventDefault();event.stopPropagation()}}
+    if(event.ctrlKey&&event.shiftKey&&event.key){let f,k=event.key!=='"'?event.key:'\\"';for(let el of document.querySelectorAll(`[ctrlshiftkey="${k.toLowerCase()}"]`)){el.focus();el.click();f=1}if(f){event.preventDefault();event.stopPropagation()}}
+    if(event.key==='Escape'){for(let el of document.querySelectorAll('[onescape]')){new Function(el.getAttribute('onescape')).call(el)}}
+    else if(event.key==='F2'){app.promptForUpdate()}
+  };
+  window.addEventListener('keydown',app.element,{capture:1});app.element.handleEvent.unbounds=[e=>window.removeEventListener('keydown',e,{capture:1})];
+  window.onbeforeunload=function(){if(!window.app){return window.onbeforeunload=null}if(window.app.state.modified)return 'Quit? Changes that you made may not be saved.'};
+  if(app.hasNwJs){try{window.nwWindow=nw.Window.get();}catch(_){}try{nwWindow.on('new-win-policy',function(frame,url,policy){policy.ignore();nw.Shell.openExternal(url)})}catch(e){alert(e)}}
+
+  let data=document.body.innerHTML;
+  document.body.innerHTML="";
+  app.editor.innerHTML=data;
+  document.body.appendChild(app.element);
+  app.update(Object.assign({appinit:1,
+    filename:app.hasNwJs?require('path').basename(decodeURIComponent(location.pathname)):decodeURIComponent(location.pathname.replace(/^.*\//,'')),
+    filepath:app.hasNwJs?decodeURIComponent(require('os').platform()==='win32'?location.pathname.slice(1):location.pathname):null,
+  },preferences,{title,version,license}));
+  delete app.state.appinit;
+},{passive:true,once:true});
+</script>
+<style>
+  .nodisplay{display:none !important}
+  @media only screen and (min-width:45em){.noscreen,.printonly,.smallwindowonly{display:none !important}}
+  @media only screen and (max-width:45em){.noscreen,.printonly,.largewindowonly{display:none !important}}
+  @media print{.noprint,.screenonly{display:none !important}body{margin:0}}
+  @media only screen{
+    body>div[name=app]>div[name=bars]{background-color:rgba(255,255,255,0.7);box-shadow:0px -16px 0px 16px rgba(255,255,255,0.7);border-bottom:1px solid rgba(10, 10, 10, 0.1)}
+    body>div[name=app]>div[name=bars]>div{display:flex}
+    body>div[name=app]>div[name=bars]>div>span{display:inline-block;height:1cm;line-height:1cm;padding:0 0.2em 0 0.2em;white-space:nowrap}
+    body>div[name=app]>div[name=bars]>div>span>button{border:none;background-color:transparent;width:3em;height:2em;text-align:center}
+    body>div[name=app]>div[name=bars]>div>span>button:hover{background-color:rgba(0,0,0,0.1)}
+    body>div[namp=app]>div[name=bars] select{width:2cm}
+    body{background-color:#CCC}
+    body>div[name=app]>div[name=editor]{background-color:#FFF}
+    body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:1cm;margin:1em 0 0 0}
+    body>div[name=app]>div[name=editor].pageformat-A4 *{word-wrap:break-word;white-space:unset}
+    body>div[name=app]>div[name=editor].pageformat-fullwidth{min-height:10em}
+    body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(185,106,0,0.1);box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)}
+  }
+
+  *{box-sizing:border-box;max-width:100%}
+  blockquote{border-left:solid 1px blue;padding: 0 0 0 1em;margin: 1em 0 1em 0}
+  a[download]::after{content:"[" attr(data-size) " " attr(download) "]"}
+  a[download][uploading],body>div[name=app]>div[name=editor] img[uploading]{opacity:0.5}
+  iframe{width:100%}
+</style>
+<title>Page.html</title></head><body onload="try{app.update({&quot;appshowabout&quot;:1,&quot;contenteditable&quot;:1,&quot;spellcheck&quot;:1,&quot;lang&quot;:&quot;&quot;,&quot;pageformat&quot;:&quot;A4&quot;,&quot;showtaglevels&quot;:0})}catch(_){}">
+  <p><br></p>
+</body></html>
