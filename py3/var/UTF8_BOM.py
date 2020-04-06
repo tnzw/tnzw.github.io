@@ -1,0 +1,1 @@
+UTF8_BOM = b"\xef\xbb\xbf"

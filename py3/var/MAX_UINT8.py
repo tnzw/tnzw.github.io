@@ -1,0 +1,1 @@
+MAX_UINT8 = 0xFF  # 255
