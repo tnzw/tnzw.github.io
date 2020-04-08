@@ -1,4 +1,4 @@
-# fs_copyfile.py Version 1.3.3
+# fs_copyfile.py Version 1.3.4
 # Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -19,7 +19,11 @@ fs_copyfile(src, dst, [flags, [**opt...]]) -> Error
     preserve_mode => 0
     preserve_ownership => 0
     check_platform => 1
-    buffer_size => None      : Defaults to BUFFER_SIZE or 32Ki.
+    buffer_size => None      : Defaults to src stat.st_blksize or
+                               fs_copyfile.DEFAULT_BUFFER_SIZE or
+                               DEFAULT_BUFFER_SIZE or
+                               io.DEFAULT_BUFFER_SIZE or
+                               32Ki.
 """
   def catch(fn, **k):
     try: fn()
@@ -35,12 +39,9 @@ fs_copyfile(src, dst, [flags, [**opt...]]) -> Error
     e = E(*a)
     for p,v in k.items(): setattr(e,p,v)
     return e
-
-  if buffer_size is None:
-    buffer_size = 32 * 1024
-    try:
-      if isinstance(BUFFER_SIZE, int) and BUFFER_SIZE > 0: buffer_size = BUFFER_SIZE
-    except NameError: pass
+  def getbufsize(v):
+    if isinstance(v, int) and v > 0: return v
+    raise TypeError("invalid buffer size")
 
   excl = "x" if flags & 1 else ""
 
@@ -53,10 +54,20 @@ fs_copyfile(src, dst, [flags, [**opt...]]) -> Error
     if err: return err
     out_fd = out_f.fileno()
     try:
-      stats = None
-      if preserve_timestamps or preserve_mode or preserve_ownership:
-        err, stats = catch2(lambda: os.fstat(in_fd), syscall="fstat")
-        if err: return err
+      err, stats = catch2(lambda: os.fstat(in_fd), syscall="fstat")
+      if err: return err
+
+      if buffer_size is None:
+        buffer_size = 32 * 1024
+        try: buffer_size = getbufsize(stats.st_blksize)
+        except (AttributeError, TypeError):
+          try: buffer_size = getbufsize(fs_copyfile.DEFAULT_BUFFER_SIZE)
+          except (AttributeError, TypeError):
+            try: buffer_size = getbufsize(DEFAULT_BUFFER_SIZE)
+            except (NameError, TypeError):
+              try: buffer_size = getbufsize(io.DEFAULT_BUFFER_SIZE)
+              except (NameError, AttributeError, TypeError): pass
+
       if preserve_mode:
         err = catch(lambda: os.chmod(dst, stats.st_mode), syscall="chmod")
         if err: return err

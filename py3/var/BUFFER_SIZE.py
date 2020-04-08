@@ -1,1 +1,0 @@
-BUFFER_SIZE = 32 * 1024
