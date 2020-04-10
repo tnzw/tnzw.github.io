@@ -1,4 +1,4 @@
-# tar_MetadataBlock.py Version 1.0.0
+# tar_MetadataBlock.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -102,6 +102,6 @@ block = tar_MetadataBlock(file.read(512))
     return cstr[:i]
   def _cstr_pad(self, cstr, length):
     cstr = self.cstr_to_bytes(cstr)
-    if len(cstr) >= length:
+    if len(cstr) > length:  # `tar` behavior. `7z` behavior would be with a >=
       raise ValueError("too long")
     return (cstr + b"\x00" * length)[:length]

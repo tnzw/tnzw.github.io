@@ -1,4 +1,4 @@
-# fs_mkdir.py Version 1.1.2
+# fs_mkdir.py Version 1.1.3
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -26,10 +26,11 @@ fs_mkdir(path, mode=0o777, parents=False)
     except Exception as e: return e
     return None
   dir, sep = "", os.sep
-  if isinstance(path, bytes): dir, sep = b"", sep.encode("ascii")
+  if isinstance(path, bytes): dir, sep = b"", os.fsencode(sep)
   path = path.split(sep)
   if parents > 0: root = []
   else: root, path = path[:parents-1], path[parents-1:]
+  if root and not root[0]: root[0] = sep
   for i in range(len(path) - 1):
     try: os.mkdir(os.path.join(*root + path[:i + 1]), mode=mode)
     except FileExistsError: pass
