@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
 <!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.2.1
+const banner=`Page.html Version 2.3.0
 Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -15,7 +15,7 @@ http://www.wtfpl.net/ for more details.`,
   version=(/Version (.*)/m).exec(banner)[1],
   license=banner.replace(/^.*\n/,"");
 
-const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,lang:"",pageformat:"A4",showtaglevels:0});
+const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,lang:"",pageformat:"A4",showtaglevels:0,defaultParagraphSeparator:"p"});
 const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
 const exportPreferenceKeys=["lang"];
 
@@ -39,7 +39,7 @@ window.addEventListener('load',function(){
     unbase64(data){if(ArrayBuffer.isView(data))data=new TextDecoder().decode(new Uint8Array(data));else data=`${data}`;let bs=atob(data);data=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)data[i]=bs.charCodeAt(i);return data},
     openFile(opt,fn){var f=this.fileElement;opt=opt||0;f[(opt.multiple?'set':'remove')+'Attribute']('multiple','multiple');if(this.hasNwJs)f[(this.state.filepath?'set':'remove')+'Attribute']('nwworkingdir',require('path').dirname(this.state.filepath));f[(opt.nwsaveas?'set':'remove')+'Attribute']('nwsaveas',this.state.filename);f.onchange=fn;f.click()},
     downloadData(data,as){let a=this.downloadElement;a.href=window.URL.createObjectURL(new Blob([data]));a.download=as;setTimeout(_=>a.href='#',100);a.click()},
-    clearFile(){if(this.state.modified&&!confirm('New document? Changes that you made may not be saved.'))return;this.editor.innerHTML='<p><br></p>';app.update({filepath:undefined,filename:"untitled.html",pageformat:"A4",contenteditable:1,modified:0});this.editor.focus()},
+    clearFile(){if(this.state.modified&&!confirm('New document? Changes that you made may not be saved.'))return;this.editor.innerHTML='<'+this.state.defaultParagraphSeparator+'><br></'+this.state.defaultParagraphSeparator+'>';app.update({filepath:undefined,filename:"untitled.html",pageformat:"A4",contenteditable:1,modified:0});this.editor.focus()},
     async loadFile(file){if(file===null)return;
       if(file===undefined)return this.openFile({},e=>this.loadFile(e.target.files[0]||null));
       if(this.state.modified)if(!confirm('Load document? Changes that you made may not be saved.'))return;
@@ -49,8 +49,8 @@ window.addEventListener('load',function(){
       if(mime=this.editableExtMimeDict[ext]){
         if(mime==='text/html'){try{dom=new DOMParser().parseFromString((text||(text=await this.readBlob(file,'text'))),'text/html')}catch(_){}}
         if(dom){this.editor.innerHTML=dom.body.innerHTML;setTimeout(_=>{var i=document.body.querySelector('[autofocus]');if(i)i.focus()})}
-        else if(mime.startsWith('text/')||mime==='application/javascript')this.editor.innerHTML='<p>'+this.escapeHTML((text||(text=await this.readBlob(file,'text')))).replace(/(\n+)\n/g,(m,n)=>'<br>'.repeat(n.length)+'</p><p>').replace(/\n/g,'<br>')+'</p>';
-        else if(mime.startsWith('image/'))this.editor.innerHTML='<p><img src="data:'+mime+';base64,'+this.base64((data||(data=await this.readBlob(file,'arraybuffer'))))+'"></p><p><br></p>';
+        else if(mime.startsWith('text/')||mime==='application/javascript')this.editor.innerHTML='<'+this.state.defaultParagraphSeparator+'>'+this.escapeHTML((text||(text=await this.readBlob(file,'text')))).replace(/(\n+)\n/g,(m,n)=>'<br>'.repeat(n.length)+'</'+this.state.defaultParagraphSeparator+'><'+this.state.defaultParagraphSeparator+'>').replace(/\n/g,'<br>')+'</'+this.state.defaultParagraphSeparator+'>';
+        else if(mime.startsWith('image/'))this.editor.innerHTML='<'+this.state.defaultParagraphSeparator+'><img src="data:'+mime+';base64,'+this.base64((data||(data=await this.readBlob(file,'arraybuffer'))))+'"></'+this.state.defaultParagraphSeparator+'><'+this.state.defaultParagraphSeparator+'><br></'+this.state.defaultParagraphSeparator+'>';
         return this.update({filepath:file.path,filename:file.name,modified:0,pageformat:"A4"});
       }
       if (mime=this.loadableExtMimeDict[ext]) {
@@ -240,7 +240,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
           option({value:"s",onselect:"this.parentNode.value='';app.editor.ctl('strikeThrough')"},"Strike")
         ])]),
         span({class:"largewindowonly"},[
-          button({onclick:"app.editor.ctl('formatBlock','p')"},"¶"),
+          button({onclick:"app.editor.ctl('formatBlock',app.state.defaultParagraphSeparator)"},"¶"),
           button({onclick:"app.editor.ctlHBig()"},"<b>H</b><sub>1</sub>"),
           button({onclick:"app.editor.ctlHSmall()"},"<b>H</b><sub>2</sub>"),
           button({onclick:"app.editor.ctlQuote()"},"«»"),
@@ -248,7 +248,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
         ]),
         span({class:"smallwindowonly"},[select([
           option({value:"",selected:"selected"},"Format."),
-          option({value:"p",onselect:"this.parentNode.value='';app.editor.ctl('formatBlock','p')"},"Normal"),
+          option({value:"p",onselect:"this.parentNode.value='';app.editor.ctl('formatBlock',app.state.defaultParagraphSeparator)"},"Normal"),
           option({value:"h1",onselect:"this.parentNode.value='';app.editor.ctlHBig()"},"Title +"),
           option({value:"h2",onselect:"this.parentNode.value='';app.editor.ctlHSmall()"},"Title -"),
           option({value:"q",onselect:"this.parentNode.value='';app.editor.ctlQuote()"},"Quote"),
@@ -282,7 +282,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
         if('pageformat' in u){this.classList.remove('pageformat-'+event.updated.pageformat);this.classList.add('pageformat-'+u.pageformat)}
         if('lang' in u)document.children[0].lang=u.lang;
         if('showtaglevels' in u)this.classList[u.showtaglevels?'add':'remove']('showtaglevels');`,
-      onfocus:"this.cmd('defaultParagraphSeparator','p')",
+      onfocus:"this.cmd('defaultParagraphSeparator',app.state.defaultParagraphSeparator)",
       oninput:"if(this.contentEditable=='true')app.update({modified:1})",onblur:"for(let e of this.querySelectorAll('h1,h2,h3,h4,h5,h6'))e.id=e.textContent",
       onclick:"for(let a of this.iterParentElements(event.target,1))if(a.tagName==='A'&&!a.download&&!a.target&&a.href.replace(/#.*/,'')!==location.href.replace(/#.*/,'')){a.target='_blank';setTimeout(_=>a.removeAttribute('target'))}",
       onkeydown:"if(this.contentEditable=='true'&&event.key==='Tab'){event.preventDefault();this.cmd(event.shiftKey?'outdent':'indent')}",
@@ -441,6 +441,6 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
   a[download][uploading],body>div[name=app]>div[name=editor] img[uploading]{opacity:0.5}
   iframe{width:100%}
 </style>
-<title>Page.html</title></head><body onload="try{app.update({&quot;appshowabout&quot;:1,&quot;contenteditable&quot;:1,&quot;spellcheck&quot;:1,&quot;lang&quot;:&quot;&quot;,&quot;pageformat&quot;:&quot;A4&quot;,&quot;showtaglevels&quot;:0})}catch(_){}">
+<title>Page.html</title></head><body onload="try{app.update({&quot;appshowabout&quot;:1,&quot;contenteditable&quot;:1,&quot;spellcheck&quot;:1,&quot;lang&quot;:&quot;&quot;,&quot;pageformat&quot;:&quot;A4&quot;,&quot;showtaglevels&quot;:0,&quot;defaultParagraphSeparator&quot;:&quot;p&quot;})}catch(_){}">
   <p><br></p>
 </body></html>
