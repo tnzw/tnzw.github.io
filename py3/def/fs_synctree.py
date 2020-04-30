@@ -1,4 +1,4 @@
-# fs_synctree.py Version 3.3.2
+# fs_synctree.py Version 3.4.0
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -8,7 +8,7 @@
 
 def fs_synctree(src, dst,
                 action="merge", move=False,
-                compare_mtime=1, compare_size=True, compare_head_n=0, compare_content=False, compare_symlink=True,
+                compare_mtime=1, compare_size=True, compare_head=0, compare_content=False, compare_symlink=True,
                 preserve_timestamps=True, preserve_mode=True, preserve_ownership=False,
                 dryrun=False,
                 backup_directory=None, backup_updates=True, backup_deletions=True,
@@ -17,16 +17,21 @@ def fs_synctree(src, dst,
   """\
 fs_synctree(src, dst, **options) -> Error
   action => "merge"
-    merge : Copy SRC files in DST. Existing files are overwritten.
+    merge  : Copy SRC files in DST. Existing files are overwritten.
     update : Copy SRC files in DST. Existing files are overwritten only if files are not equal.
     mirror : Copy SRC files in DST and remove DST files that don't exist in SRC. Existing files are overwritten only if files are not equal.
-    clean : Remove DST files that don't exist in SRC.
+    clean  : Remove DST files that don't exist in SRC.
   move => 0                   : XXX NIY
   compare_mtime => 1          : Compare the modification time of each files. This is used to check if two files are "equal".
                                 0 => do not compare, N>0 => compare mtime with N accuracy in seconds. (ex: 2 => for FAT32 file system.)
   compare_size => True        : Compare the size of each files.
-  compare_head_n => 0         : XXX NIY Compare the first n bytes. Ex: compare_head_n => 4096
-  compare_content => False    : XXX NIY Nearly as long as direct copying without comparing. At least, it avoids to write for nothing.
+  compare_head => 0           : Compare the first bytes of each files. Ex:
+                                compare_head = 4096, checks first 4096 bytes
+                                compare_head < 0, checks all file bytes <=> compare_content = True
+                                Overrides compare_content value if compare_head != 0.
+  compare_content => False    : Compare the content of each files.
+                                Nearly as long as direct copying without comparing.
+                                At least, it avoids to write for nothing.
   compare_symlink => True
   preserve_timestamps => True
   preserve_mode => True
@@ -44,12 +49,12 @@ fs_synctree(src, dst, **options) -> Error
 
   def catch(fn,**k):
     try: fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       return onerror(e)
   def catch2(fn,*d,oe=True,**k):
     try: return None, fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       if oe: e = onerror(e)
       return e, d[0] if d else None
@@ -77,8 +82,9 @@ fs_synctree(src, dst, **options) -> Error
     if not os.path.isdir(_):
       return mkerr(NotADirectoryError, errno.ENOTDIR, "Not a directory", filename=_)
 
-  compare_file = True if compare_mtime or compare_size or compare_head_n > 0 or compare_content else False
+  compare_file = True if compare_mtime or compare_size or compare_head != 0 or compare_content else False
   compare_link = True if compare_symlink else False
+  if compare_head == 0 and compare_content: compare_head = -1
 
   srcl, dstl = len(src), len(dst)
   sep = os.sep
@@ -145,22 +151,12 @@ fs_synctree(src, dst, **options) -> Error
       if compare_size and curstat.st_size != newstat.st_size: return None, 0
       if compare_mtime and (curstat.st_mtime > newstat.st_mtime + mtimeaccuracy or curstat.st_mtime + mtimeaccuracy < newstat.st_mtime):
         return None, 0
-      # XXX do other comparison methods
-      if (compare_head_n > 0):
-        #my ($d1, $d2);
-        #($err, $d1) = fs_readfile($cur, {end=>$optcmphead});
-        #$err = &$onerror($err, "fs_readfile", $cur) if $err;
-        #return $err if $err;
-        #($err, $d2) = fs_readfile($new, {end=>$optcmphead});
-        #$err = &$onerror($err, "fs_readfile", $new) if $err;
-        #return $err if $err;
-        #$equal = 0 unless $d1 eq $d2;
-        # XXX use fs_diff($cur, $new, {end=>$optcmpheadn}) instead.
-        pass
-      if (compare_content):
-        # XXX use a kind of fs_diff($cur, $new)
-        pass
-      # XXX &$optcmp(...)
+      if compare_head:  # also handles compare_content as compare_head can be < 0
+        with open(cur, "rb") as curf:
+          with open(new, "rb") as newf:
+            err, equals = catch2(lambda: io_diff(curf, newf, length=compare_head), False)
+            if err or not equals: return err, 0
+      # XXX do a kind of compare_func(cur, new) ?
       return None, 1;
     elif stat.S_ISDIR(curstat.st_mode): return None, 1
     return None, 0
@@ -305,11 +301,13 @@ fs_synctree(src, dst, **options) -> Error
       if err: return err
     return None
   return fs_iterdirsdiff(rec, [src, dst]);
+
 fs_synctree._required_globals = [
   "errno",
   "os",
   "stat",
   "sys",
+  "io_diff",
   "fs_copyfile",
   "fs_mkdir",
   "fs_move",

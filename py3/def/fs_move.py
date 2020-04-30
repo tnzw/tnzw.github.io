@@ -1,4 +1,4 @@
-# fs_move.py Version 1.0.3
+# fs_move.py Version 1.0.5
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -26,19 +26,14 @@ fs_move(src, dst, **opt) -> Error
 """
   def catch(fn, **k):
     try: fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       return e
   def catch2(fn, *d, **k):
     try: return None, fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       return e, d[0] if d else None
-  def handle(fn, *d, **k):
-    try: err = fn()
-    except Exception as e: err = e
-    for p,v in k.items(): setattr(e,p,v)
-    return err
   def mkerr(E, *a, **k):
     e = E(*a)
     for p,v in k.items(): setattr(e,p,v)
@@ -104,7 +99,7 @@ fs_move(src, dst, **opt) -> Error
           # or should we use os.chmod(path, stat.S_IWRITE) ? -> remove file readonly flag
           err = catch(lambda: os.unlink(cur), syscall="unlink")
           if err: return err
-        err = handle(lambda: fs_copyfile(cur, new, preserve_timestamps=preserve_timestamps, preserve_mode=preserve_mode, preserve_ownership=preserve_ownership, buffer_size=buffer_size))
+        err = fs_copyfile(cur, new, preserve_timestamps=preserve_timestamps, preserve_mode=preserve_mode, preserve_ownership=preserve_ownership, buffer_size=buffer_size)
         if err: return err
       elif stat.S_ISDIR(newstat.st_mode):
         return mkerr(NotADirectoryError, errno.ENOTDIR, "cannot overwrite non-directory " + repr(new) + " with directory " + repr(cur), filename=new)

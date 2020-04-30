@@ -1,4 +1,4 @@
-# fs_copyfile.py Version 1.3.4
+# fs_copyfile.py Version 1.3.5
 # Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -27,12 +27,12 @@ fs_copyfile(src, dst, [flags, [**opt...]]) -> Error
 """
   def catch(fn, **k):
     try: fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       return e
   def catch2(fn, *d, **k):
     try: return None, fn()
-    except Exception as e:
+    except OSError as e:
       for p,v in k.items(): setattr(e,p,v)
       return e, d[0] if d else None
   def mkerr(E, *a, **k):

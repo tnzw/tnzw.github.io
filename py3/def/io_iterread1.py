@@ -1,4 +1,4 @@
-# io_iterread1.py Version 1.0.1
+# io_iterread1.py Version 1.0.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -7,6 +7,13 @@
 # http://www.wtfpl.net/ for more details.
 
 def io_iterread1(reader, length=None, size=None, fallback=True):
+  """\
+io_iterread1(reader, length=4096, size=1024, fallback=True)
+  reader   => an object that is readable
+  length   => the total amount of data to read
+  size     => the maximum chunk size to read
+  fallback => fallback to reader.read if reader.read1 is not available
+"""
   def getsize(v):
     if isinstance(v, int) and v > 0: return v
     raise TypeError("invalid buffer size")
