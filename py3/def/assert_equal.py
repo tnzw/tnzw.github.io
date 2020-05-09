@@ -1,4 +1,4 @@
-# assert_equal.py Version 1.0.0
+# assert_equal.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -10,3 +10,5 @@ def assert_equal(a, b, message=None):
   if message is None:
     message = "{} != {}".format(pprint.pformat(a), pprint.pformat(b))
   assert a == b, message
+
+assert_equal._required_globals = ["pprint"]

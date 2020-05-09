@@ -38,12 +38,18 @@ def test_tar_xf_3_long_filenames_with_long_links():
     # long_link abc...
     # long_link zxy...
     # zxy... -> abc...
-    tar_xf(f, directory=tmpdir)
+    if sys.platform == "win32":
+      err = assert_raise(OSError, lambda: tar_xf(f, directory=tmpdir))
+      # XXX check err
+    else:
+      tar_xf(f, directory=tmpdir)
     assert os.path.isfile(os.path.join(tmpdir, "1234567890"*11))
-    assert os.path.isfile(os.path.join(tmpdir, "abcdefghijklmnopqrstuvwxyz"*4))
-    assert os.path.islink(os.path.join(tmpdir, "zyxwvutsrqponmlkjihgfedcba"*4))
     assert_equal(os.lstat(os.path.join(tmpdir, "1234567890"*11)).st_nlink, 2)
+    assert os.path.isfile(os.path.join(tmpdir, "abcdefghijklmnopqrstuvwxyz"*4))
     assert_equal(os.lstat(os.path.join(tmpdir, "abcdefghijklmnopqrstuvwxyz"*4)).st_nlink, 2)
+    if sys.platform == "win32":
+      return
+    assert os.path.islink(os.path.join(tmpdir, "zyxwvutsrqponmlkjihgfedcba"*4))
     assert_equal(os.readlink(os.path.join(tmpdir, "zyxwvutsrqponmlkjihgfedcba"*4)), "abcdefghijklmnopqrstuvwxyz"*4)
   finally:
     shutil.rmtree(tmpdir)

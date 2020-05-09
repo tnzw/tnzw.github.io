@@ -1,4 +1,4 @@
-# fs_iterdirsdiff.py Version 1.0.1
+# fs_iterdirsdiff.py Version 1.0.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -34,8 +34,10 @@ fs_iterdirsdiff(action, paths) -> Error
   dirpaths = []
   subpaths = []
   for _ in paths:
-    err, dirs = catch(lambda: None if _ is None else os.listdir(_))
-    if err and err.__class__ not in (NotADirectoryError, FileNotFoundError):
+    dirs = None
+    try: dirs = None if _ is None else os.listdir(_)
+    except (NotADirectoryError, FileNotFoundError): pass
+    except OSError as err:
       err = action(err, None, None)
       if err: return err
     dirpaths.append(None if dirs is None else _)

@@ -1,4 +1,4 @@
-# fs_synctree.py Version 3.4.0
+# fs_synctree.py Version 3.4.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -113,7 +113,7 @@ fs_synctree(src, dst, **options) -> Error
         err = None if dryrun else catch(lambda: getattr(os, "chown", lambda *_: None)(new, curstat.st_uid, curstat.st_gid), syscall="chown")
         if err: return err
         return None if dryrun else catch(lambda: os.rmdir(cur), syscall="rmdir")
-      return mkerr(FileExistsError, errno.EEXIST, "backup file already exists", filename=new)  # XXX is it realy expected behavior ?
+      return mkerr(FileExistsError, errno.EEXIST, "backup file already exists", filename=new, syscall=None)  # XXX is it realy expected behavior ?
 
     err = fs_mkdir(backup_directory + sep + comdir, parents=-comdir.count(sep), exist_ok=True)
     if err: err = onerror(err)
@@ -164,9 +164,9 @@ fs_synctree(src, dst, **options) -> Error
   def copynode(curstat, cur, newstat, new, bak, comdir, equal):
     # here, $new is the same type as $cur, or non existing.
     written = 0
-    if newstat and curstat.st_mode & 0xF000 != newstat.st_mode & 0xF000 and stat.S_ISDIR(curstat.st_mode):
-      # do not remove if $cur is a directory, as it is removed while descending the tree
-      err = removenode(newstat, new)
+    if newstat and curstat.st_mode & 0xF000 != newstat.st_mode & 0xF000 and not stat.S_ISDIR(curstat.st_mode):
+      # do not remove if $cur is a directory, as $new is removed while descending the tree
+      err = removenode(newstat, new, bak, comdir)
       if err: return err
     if stat.S_ISLNK(curstat.st_mode):
       if equal: return None
@@ -238,9 +238,9 @@ fs_synctree(src, dst, **options) -> Error
   if backup_directory and backup_deletions:
     progressdelete = lambda *a: onprogress("backup", *a)
 
-  if action not in ("merge", "update", "mirror"): progressupdate = lambda: None
-  if action not in ("merge", "update", "mirror"): progresscreate = lambda: None
-  if action not in ("mirror", "clean"): progressdelete = lambda: None
+  if action not in ("merge", "update", "mirror"): progressupdate = lambda *a: None
+  if action not in ("merge", "update", "mirror"): progresscreate = lambda *a: None
+  if action not in ("mirror", "clean"): progressdelete = lambda *a: None
 
   def rec(err, name, roots):
     if err:
@@ -280,6 +280,11 @@ fs_synctree(src, dst, **options) -> Error
     if err: return err
 
     sharedlink[0] = None
+
+    if bak and curstat and newstat and stat.S_ISDIR(curstat.st_mode):
+      # Often, backup moves files, so the parent folder change its stats. We have to reload it
+      err, newstat = catch2(lambda: os.lstat(new), syscall="lstat")
+      if err: return err
 
     if curstat and newstat:
       err, cmp = comparenode(curstat, cur, newstat, new)
