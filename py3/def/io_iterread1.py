@@ -1,4 +1,4 @@
-# io_iterread1.py Version 1.0.2
+# io_iterread1.py Version 1.1.0
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -9,10 +9,13 @@
 def io_iterread1(reader, length=None, size=None, fallback=True):
   """\
 io_iterread1(reader, length=4096, size=1024, fallback=True)
-  reader   => an object that is readable
-  length   => the total amount of data to read
-  size     => the maximum chunk size to read
-  fallback => fallback to reader.read if reader.read1 is not available
+  reader => an object that is readable
+  length => None or < 0 : read/write as most data as possible
+                      0 : read/write no data
+                    > 0 : maximum read/write amount of data
+  size => None or < 0 : use the default maximum chunk size to read
+                  > 0 : maximum chunk size to read
+  fallback => True : fallback to reader.read if reader.read1 is not available
 """
   def getsize(v):
     if isinstance(v, int) and v > 0: return v
@@ -21,7 +24,7 @@ io_iterread1(reader, length=4096, size=1024, fallback=True)
     read = getattr(reader, "read1", None)
     if read is None:
       read = reader.read
-      if size is None:
+      if size is None or size < 0:
         size = 32 * 1024
         try: size = getsize(io_iterread1.DEFAULT_BUFFER_SIZE)
         except (AttributeError, TypeError):
@@ -31,13 +34,13 @@ io_iterread1(reader, length=4096, size=1024, fallback=True)
             except (NameError, AttributeError, TypeError): pass
   else:
     read = reader.read1
-  if length is None:
+  if length is None or length < 0:
     size = [] if size is None else [size]
     while 1:
       data = read(*size)
       if data: yield data
       else: break
-  elif size is None:
+  elif size is None or size < 0:
     while length > 0:
       data = read(length)
       if data: yield data

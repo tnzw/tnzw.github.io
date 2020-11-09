@@ -47,6 +47,8 @@ def test_fs_sync_1_first_sync_archive(**K):
     assert_equal(lstat("bak/a"  ), None)
     assert_equal(lstat("bak/src"), None)
     assert_equal(lstat("bak/dst"), None)
+  # XXX please check why folders are updated again when running mirror for the second time!
+  fs_sync("src", "dst", verbose=1, onverbose=lambda *a: throw(AssertionError(sprint(*a, sep=": "))), **K)  # XXX it's seems to be a random error !!
 def test_fs_sync_1_first_sync_archive_backup_dir(**K):
   K.setdefault("backup_dir", "bak")
   return test_fs_sync_1_first_sync_archive(**K)
@@ -78,6 +80,8 @@ def test_fs_sync_2_update_file_sync_archive(**K):
     else:
       assert_notequal(lstat("bak/dst"), None)
       assert_equal(lstat("bak/dst/a"), orig_src_a_stat)
+  # XXX please check why folders are updated again when running mirror for the second time!
+  fs_sync("src", "dst", verbose=1, onverbose=lambda *a: throw(AssertionError(sprint(*a, sep=": "))), **K)  # XXX it's seems to be a random error !!
 def test_fs_sync_2_update_file_sync_archive_backup_dir(**K):
   K.setdefault("backup_dir", "bak")
   return test_fs_sync_2_update_file_sync_archive(**K)
@@ -116,6 +120,8 @@ def test_fs_sync_3_delete_file_sync_archive(**K):
       assert_equal(lstat("bak/a"), None)
       assert_equal(lstat("bak/src"), None)
       assert_equal(lstat("bak/dst"), None)
+  # XXX please check why folders are updated again when running mirror for the second time!
+  fs_sync("src", "dst", verbose=1, onverbose=lambda *a: throw(AssertionError(sprint(*a, sep=": "))), **K)  # XXX it's seems to be a random error !!
 def test_fs_sync_3_delete_file_sync_archive_backup_dir(**K):
   K.setdefault("backup_dir", "bak")
   return test_fs_sync_3_delete_file_sync_archive(**K)
@@ -165,6 +171,8 @@ def test_fs_sync_4_delete_folder_sync_archive(**K):
       assert_equal(lstat("bak/a"), None)
       assert_equal(lstat("bak/src"), None)
       assert_equal(lstat("bak/dst"), None)
+  # XXX please check why folders are updated again when running mirror for the second time!
+  fs_sync("src", "dst", verbose=1, onverbose=lambda *a: throw(AssertionError(sprint(*a, sep=": "))), **K)  # XXX it's seems to be a random error !!
 def test_fs_sync_4_delete_folder_sync_archive_backup_dir(**K):
   K.setdefault("backup_dir", "bak")
   return test_fs_sync_4_delete_folder_sync_archive(**K)

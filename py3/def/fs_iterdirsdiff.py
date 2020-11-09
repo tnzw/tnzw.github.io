@@ -1,4 +1,4 @@
-# fs_iterdirsdiff.py Version 1.0.2
+# fs_iterdirsdiff.py Version 1.1.0
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -6,9 +6,10 @@
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
-def fs_iterdirsdiff(action, paths):
+# XXX do not return error anymore (action could be wrapped in try/except, use ignore_listdir_errors=None)
+def fs_iterdirsdiff(action, paths, *, os_modules=None):
   """\
-fs_iterdirsdiff(action, paths) -> Error
+fs_iterdirsdiff(action, paths, **opt) -> Error
   import os
   def rec(err, name, roots):
     if err: raise err
@@ -23,19 +24,17 @@ fs_iterdirsdiff(action, paths) -> Error
   err = fs_iterdirsdiff(rec, [b"a", b"b", b"c"])
   print(err)
 """
-  def catch(fn):
-    try: return None, fn()
-    except Exception as e: return e, None
   def get(l, i, default=None):
     try: return l[i]
     except IndexError: return default
 
   l = len(paths)
+  if os_modules is None: os_modules = [os] * l
   dirpaths = []
   subpaths = []
-  for _ in paths:
+  for _,o in zip(paths, os_modules):
     dirs = None
-    try: dirs = None if _ is None else os.listdir(_)
+    try: dirs = None if _ is None else o.listdir(_)
     except (NotADirectoryError, FileNotFoundError): pass
     except OSError as err:
       err = action(err, None, None)
