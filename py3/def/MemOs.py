@@ -1,4 +1,4 @@
-# MemOs.py Version 1.0.0
+# MemOs.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -101,7 +101,7 @@ An os module like object that only act in memory in a virtual file system
 
   def fchmod(self, fd, mode): return self._hchmod(self._getcheck_fd(fd)["meta"], mode)
 
-  def fchown(self, fd, uid, gid): return self._chown_meta(self._getcheck_fd(fd)["meta"], uid, gid)
+  def fchown(self, fd, uid, gid): return self._hchown(self._getcheck_fd(fd)["meta"], uid, gid)
 
   def fstat(self, fd): return self.stat_result(**self._getcheck_fd(fd)["meta"])
 
