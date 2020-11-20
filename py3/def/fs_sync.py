@@ -1,4 +1,4 @@
-# fs_sync.py Version 1.4.0
+# fs_sync.py Version 1.4.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -368,7 +368,7 @@ fs_sync.remove(dst)
                 else: unlink(dst)
                 # XXX if dereference link then becareful of unsafe links !
                 symlink(link, dst)
-                # copy_stat does not work on many OSes
+                # copy_stat(dst, src_stats) does not work on many OSes
               else:
                 if verbose > 1: onverbose("uptodate", dstname)
               if remove_source_files: unlink(src)
@@ -380,7 +380,9 @@ fs_sync.remove(dst)
               if diff:
                 if verbose > 0:
                   onverbose("update", dstname)
-                if backup: dobackup(dst, backup_dir, bakname)
+                if backup:
+                  dobackup(dst, backup_dir, bakname)
+                  dst_stats = None
                 copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
               copystat(dst, src_stats, dst_stats)
               if not diff:

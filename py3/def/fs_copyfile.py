@@ -1,4 +1,4 @@
-# fs_copyfile.py Version 2.0.0
+# fs_copyfile.py Version 2.0.1
 # Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -47,9 +47,12 @@ fs_copyfile(src, dst, flags, **opt) -> read, written
     excl = dst_os_module.O_EXCL if flags & 1 else 0
     read, written = 0, 0
 
-    close_src, in_fd = (False, src) if isinstance(src, int) else (True, src_os_module.open(src, src_os_module.O_RDONLY | src_os_module.O_BINARY))  # acts like "rb"
+    src_binary = getattr(src_os_module, "O_BINARY", 0)
+    dst_binary = getattr(dst_os_module, "O_BINARY", 0)
+
+    close_src, in_fd = (False, src) if isinstance(src, int) else (True, src_os_module.open(src, src_os_module.O_RDONLY | src_binary))  # acts like "rb"
     try:
-      close_dst, out_fd = (False, dst) if isinstance(dst, int) else (True, dst_os_module.open(dst, dst_os_module.O_WRONLY | dst_os_module.O_CREAT | (excl or dst_os_module.O_TRUNC) | dst_os_module.O_BINARY))  # acts like "wb" or "xb"
+      close_dst, out_fd = (False, dst) if isinstance(dst, int) else (True, dst_os_module.open(dst, dst_os_module.O_WRONLY | dst_os_module.O_CREAT | (excl or dst_os_module.O_TRUNC) | dst_binary))  # acts like "wb" or "xb"
       try:
         stats = src_os_module.fstat(in_fd)
     

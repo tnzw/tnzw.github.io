@@ -1,4 +1,4 @@
-# printerr.py Version 1.0.0
+# printerr.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -8,3 +8,4 @@
 
 def printerr(*a, **k):
   print(*a, file=sys.stderr, **k)
+printerr._required_globals = ["sys"]

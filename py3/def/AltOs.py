@@ -1,4 +1,4 @@
-# AltOs.py Version 1.0.0
+# AltOs.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -165,22 +165,15 @@ Same as os module but with:
     fd = getattr(os, method)(path, flags, *a, **k)
     self._proc_fd[fd] = self
     return fd
-  @property
-  def O_RDONLY(self): return os.O_RDONLY
-  @property
-  def O_WRONLY(self): return os.O_WRONLY
-  @property
-  def O_RDWR  (self): return os.O_RDWR
-  @property
-  def O_APPEND(self): return os.O_APPEND
-  @property
-  def O_CREAT (self): return os.O_CREAT
-  @property
-  def O_EXCL  (self): return os.O_EXCL
-  @property
-  def O_TRUNC (self): return os.O_TRUNC
-  @property
-  def O_BINARY(self): return os.O_BINARY
+  O_RDONLY    = 0
+  O_WRONLY    = 1
+  O_RDWR      = 2
+  O_APPEND    = 8
+  O_CREAT     = 256
+  O_EXCL      = 1024
+  O_TRUNC     = 512
+  O_BINARY    = 32768
+  O_NOINHERIT = 128
   def close(self, fd):
     o = self._proc_fd[fd]
     if o is self: os.close(fd)
@@ -198,10 +191,8 @@ Same as os module but with:
     if o is self: return getattr(os, method)(fd, pos, how)
     how = self._convert_lseek_how(how, o)
     return getattr(o, method)(fd, pos, how)
-  @property
-  def SEEK_SET(self): return os.SEEK_SET
-  @property
-  def SEEK_CUR(self): return os.SEEK_CUR
-  @property
-  def SEEK_END(self): return os.SEEK_END
+  SEEK_SET = 0
+  SEEK_CUR = 1
+  SEEK_END = 2
+
 AltOs._required_globals = ["os", "errno"]
