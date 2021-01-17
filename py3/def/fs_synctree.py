@@ -15,6 +15,7 @@ def fs_synctree(src, dst,
                 buffer_size=None,
                 onerror=None, onfilter=None, onprogress=None):
   """\
+DEPRECATED, please use fs_sync(src, dst, source_directory=True, ...) instead
 fs_synctree(src, dst, **options) -> Error
   action => "merge"
     merge  : Copy SRC files in DST. Existing files are overwritten.

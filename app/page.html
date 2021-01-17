@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
 <!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.3.1
+const banner=`Page.html Version 2.3.2
 Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -13,7 +13,8 @@ To Public License, Version 2, as published by Sam Hocevar. See
 http://www.wtfpl.net/ for more details.`,
   title=(/[^\s]+/).exec(banner)[1],
   version=(/Version (.*)/m).exec(banner)[1],
-  license=banner.replace(/^.*\n/,"");
+  license=banner.replace(/^.*\n/,""),
+  fork_me_on="https://github.com/tnzw/tnzw.github.io/blob/master/app/page.html";
 
 const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,lang:"",pageformat:"A4",showtaglevels:0,defaultParagraphSeparator:"p"});
 const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
@@ -160,7 +161,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
       div({style:"background-color:#fff;align-self:center;border:1px solid #000;padding:1em"},[
         dce("p",[dce("b",{onappupdate:"let u=event.updates;if('title' in u)this.textContent=u.title"},"Page.html")," ",dce("sub",{onappupdate:"let u=event.updates;if('version' in u)this.textContent=u.version"},"-.-.-")]),
         dce("p",{onappupdate:"let u=event.updates;if('license' in u)this.innerHTML=event.target.escapeHTML(u.license).replace(/\\n/g,'<br>')"},"LICENSE"),
-        dce("p",["Fork me on ",dce("a",{href:"https://github.com/tnzw/tnzw.github.io/blob/master/app/page.html",target:"_blank",rel:"noopener noreferrer"},"github"),"!"]),
+        dce("p",["Fork me on ",dce("a",{href:fork_me_on,target:"_blank",rel:"noopener noreferrer"},"github"),"!"]),
         div([button({onappupdate:"if(event.updates.appshowabout)this.focus()",onclick:"app.update({appshowabout:0})",onescape:"(this.offsetParent!==null)&&this.click()"},"Ok")])
       ])
     ]),
@@ -430,7 +431,6 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
     body{background-color:#CCC}
     body>div[name=app]>div[name=editor]{background-color:#FFF}
     body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:1cm;margin:1em 0 0 0}
-    body>div[name=app]>div[name=editor].pageformat-A4 *{word-wrap:break-word;white-space:unset}
     body>div[name=app]>div[name=editor].pageformat-fullwidth{min-height:10em}
     body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(185,106,0,0.1);box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)}
   }

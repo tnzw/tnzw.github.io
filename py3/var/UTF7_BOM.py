@@ -1,0 +1,1 @@
+UTF7_BOM = b"\x2b\x2f\x76"

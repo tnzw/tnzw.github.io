@@ -37,6 +37,35 @@ def test_MemOs_mkdir():
   memos.umask(0o022)
   memos.mkdir("for_mode", 0o222)  # testing umask
   assert_equal(memos.stat("for_mode").st_mode & 0o777, 0o200)
-  # XXX test create dir in root from elsewhere
+  memos.chdir("d/a")
+  assert_raise(FileNotFoundError, lambda: memos.mkdir("/e/f"))  # testing root traversal FileNotFoundError
+  assert_raise(FileExistsError, lambda: memos.mkdir("/d"))  # testing root FileExistsError
+  memos.mkdir("/e")  # testing create dir in root
+  memos.mkdir("/e/f")  # testing create dir in root sub folder
+
+@MemOs_tester
+def test_MemOs_read():
+  memos = MemOs()
+  r = memos.open("r", memos.O_WRONLY | memos.O_CREAT | memos.O_TRUNC)
+  memos.write(r, b"first line\nsecond line\nthird line")
+  memos.close(r)
+  r = memos.open("r", memos.O_RDONLY)
+  assert_equal(memos.read(r, 3), b"fir")
+  assert_equal(memos.read(r, 3), b"st ")
+  assert_equal(memos.read(r, 3), b"lin")
+  memos.close(r)
+
+@MemOs_tester
+def test_MemOs_write():
+  memos = MemOs()
+  w = memos.open("w", memos.O_WRONLY | memos.O_CREAT | memos.O_TRUNC)
+  memos.write(w, b"first line\n")
+  memos.write(w, b"second line\n")
+  memos.write(w, b"third line")
+  memos.close(w)
+  w = memos.open("w", memos.O_RDONLY)
+  read = b"".join(_ for _ in os_iterread(w, os_module=memos))
+  memos.close(w)
+  assert_equal(read, b"first line\nsecond line\nthird line")
 
 # XXX test other methods*

@@ -1,4 +1,4 @@
-# fs_sync.py Version 1.4.1
+# fs_sync.py Version 1.5.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -84,8 +84,11 @@ fs_sync.mirror(src, dst, **kw)
 fs_sync.clean(src, dst, **kw)
   equiv fs_sync with recursive=True, delete=True, existing=True, ignore_existing=True
 
-fs_sync.remove(dst)
-  equiv fs_sync with remove_source_files=True, remove_source_dirs=True
+fs_sync.move(src, dst, **kw)
+  equiv fs_sync with recursive=True, remove_source_files=True, remove_source_dirs=True
+
+fs_sync.remove(dst, **kw)
+  equiv fs_sync with remove_source_files=True, remove_source_dirs=True (but with dst passed as src and dst)
 """
     if source_directory:
       if target_directory is None: target_directory = True
@@ -150,7 +153,7 @@ fs_sync.remove(dst)
     @verbose3
     def readlink(a):  return os_module.readlink(a)
     @verbose3("diff")
-    def same(*a,**k): return not fs_diff(*a,**k)
+    def same(*a,**k): return not fs_diff(*a, os_modules=(os_module,) * len(a), **k)
     @verbose3
     def symlink(*a):  return None if dry_run else os_module.symlink(*a)
     @verbose3
@@ -161,8 +164,10 @@ fs_sync.remove(dst)
     def _chown(*a):   return None if dry_run else os_module.chown(*a)
     @verbose3
     def mkdir(a):     return None if dry_run else os_module.mkdir(a)
+    #@verbose3
+    #def rename(*a):   return None if dry_run else os_module.rename(*a)
     @verbose3
-    def rename(*a):   return None if dry_run else os_module.rename(*a)
+    def replace(*a):  return None if dry_run else os_module.replace(*a)
     @verbose3
     def unlink(a):    return None if dry_run else os_module.unlink(a)
     @verbose3
@@ -174,10 +179,17 @@ fs_sync.remove(dst)
     def mv(*a):       return None if dry_run else fs_move(*a, buffer_size=buffer_size, src_os_module=os_module, dst_os_module=os_module)
     @verbose3("copy")
     def copyfile(*a): return None if dry_run else fs_copyfile(*a, buffer_size=buffer_size, src_os_module=os_module, dst_os_module=os_module)
-    def isdir(a):
-      try: stats = _stat(a)
-      except FileNotFoundError: return False
-      return stat.S_ISDIR(stats.st_mode)
+    #def isdir(a):
+    #  try: stats = _stat(a)
+    #  except FileNotFoundError: return False
+    #  return stat.S_ISDIR(stats.st_mode)
+
+    def softreplace(src, dst):
+      try: replace(src, dst)
+      except OSError as err:
+        if err.errno == errno.EXDEV: return False
+        raise
+      return True
 
     def copystat(dst, src_stats, dst_stats=None):
       # rsync copies the stats in any cases, without doing backup
@@ -207,7 +219,7 @@ fs_sync.remove(dst)
     def dobackup(dst, backup_dir, bakname, copy=False):
       # XXX what if backing up (rename) an hardlinked file ?
       if backup_dir:
-        for _ in iter_sum(sep+_ for _ in os_path_splitall(bakname)[:-1]):  # create parent dirs
+        for _ in iter_sum(sep+_ for _ in os_path_splitall(bakname, os_module=os_module)[:-1]):  # create parent dirs
           try: mkdir(backup_dir + _)
           except FileExistsError: pass
         bak = backup_dir + sep + bakname
@@ -216,7 +228,7 @@ fs_sync.remove(dst)
       else:
         # rsync behavior rmdir(dst+suffix) before rename (even with --force), if fails, print warning and ignore
         if copy: return _sync(dst, dst + suffix)
-        return rename(dst, dst + suffix)
+        return replace(dst, dst + suffix)
       return None
 
     def diffmodifywindow(i, j):
@@ -266,40 +278,29 @@ fs_sync.remove(dst)
       #if src_stats.st_gid != dst_stats.st_gid: return None, 1
       return 0
 
-    def rec(err, name, roots):
-      if err:
+    def rec(pathsplits):
+      """rec((("src/root", "common/path", listsrc), ("dst/root", "common/path", listdst), ("backup/root", "common/path"))"""
+      ((srcroot, srcname, listsrc), (dstroot, dstname, listdst), (backup_dir, bakname)) = pathsplits
+      src = pathextend(srcroot, srcname)
+      dst = pathextend(dstroot, dstname)
+      try: g = uniq(os_module.listdir(src) if listsrc else [], os_module.listdir(dst) if listdst else [])
+      except OSError:
         if ignore_listdir_errors: return
         raise
-      srcdir, dstdir = roots
-      comdir = srcdir[srcl:] if srcdir else dstdir[dstl:]
-      com = comdir + sep + name if comdir else name
-      arg = ((srcroot, com), (dstroot, com), (backup_dir, com))
-      try: return sync(arg)
-      except OSError:
-        if ignore_errors: return
-        if onerror is not None:
-          onerror(sync, arg, sys.exc_info())
-          return
-        raise
+      g = sorted(g)  # XXX it's not mandatory to sort. Add an fs_sync parameter for this ?
+      for name in g:
+        arg = ((srcroot, srcname + sep + name), (dstroot, dstname + sep + name), (backup_dir, bakname + sep + name))
+        try: sync(arg)
+        except OSError:
+          if ignore_errors: pass
+          elif onerror is not None: onerror(sync, arg, sys.exc_info())
+          else: raise
 
     def sync(pathsplits):
       """sync((("src/root", "common/path"), ("dst/root", "common/path"), ("backup/root", "common/path"))"""
       ((srcroot, srcname), (dstroot, dstname), (backup_dir, bakname)) = pathsplits
-      src = sep.join(_ for _ in (srcroot, srcname) if _) or None
-      dst = sep.join(_ for _ in (dstroot, dstname) if _) or None
-
-      def rec(err, name, roots):
-        if err:
-          if ignore_listdir_errors: return
-          raise
-        arg = ((srcroot, srcname + sep + name), (dstroot, dstname + sep + name), (backup_dir, bakname + sep + name))
-        try: return sync(arg)
-        except OSError:
-          if ignore_errors: return
-          if onerror is not None:
-            onerror(sync, arg, sys.exc_info())
-            return
-          raise
+      src = pathextend(srcroot, srcname)
+      dst = pathextend(dstroot, dstname)
 
       if exclude(srcname):
         if not include(srcname):
@@ -318,7 +319,7 @@ fs_sync.remove(dst)
             if (src_stats.st_mode & 0xF000) != (dst_stats.st_mode & 0xF000):
               if verbose > 0: _progressed, _ = 1, onverbose("update", dstname)
               # src and dst exist but are different type
-              if delete and stat.S_ISDIR(dst_stats.st_mode): fs_iterdirsdiff(rec, [None, dst], os_modules=(os_module, os_module))
+              if delete and stat.S_ISDIR(dst_stats.st_mode): rec(((srcroot, srcname, False), (dstroot, dstname, True), (backup_dir, bakname)))
               if backup: dobackup(dst, backup_dir, bakname)
               else:
                 try: rm(dst, dst_stats)
@@ -336,23 +337,31 @@ fs_sync.remove(dst)
             if not _progressed: onverbose("create", dstname)
           if stat.S_ISLNK(src_stats.st_mode):
             if not links: XXX  # link dereference not implemented !
-            link = readlink(src)
-            # XXX if dereference link then becareful of unsafe links !
-            symlink(link, dst)
-            # copy_stat does not work on many OSes
-            if remove_source_files: unlink(src)
+            moved = True if remove_source_files and softreplace(src, dst) else False
+            if not moved:
+              link = readlink(src)
+              # XXX if dereference link then becareful of unsafe links !
+              symlink(link, dst)
+              # XXX copy_stat does not work on many OSes
+              if remove_source_files: unlink(src)
           elif stat.S_ISREG(src_stats.st_mode):
-            copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
-            copystat(dst, src_stats)
-            if remove_source_files: unlink(src)
-          elif stat.S_ISDIR(src_stats.st_mode):
-            if recursive or dirs:
-              mkdir(dst)
-              if recursive: fs_iterdirsdiff(rec, [src, None], os_modules=(os_module, os_module))
+            moved = True if remove_source_files and softreplace(src, dst) else False
+            if not moved:
+              copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
               copystat(dst, src_stats)
+              if remove_source_files: unlink(src)
+          elif stat.S_ISDIR(src_stats.st_mode):
+            moved = False
+            if recursive or dirs:
+              if remove_source_dirs and recursive:
+                moved = True if remove_source_files and softreplace(src, dst) else False
+              if not moved:
+                mkdir(dst)
+                if recursive: rec(((srcroot, srcname, True), (dstroot, dstname, False), (backup_dir, bakname)))
+                copystat(dst, src_stats)
             else:
               if verbose > 1: onverbose("skip", dstname)
-            if remove_source_dirs: rmdir(src)
+            if remove_source_dirs and not moved: rmdir(src)
           else:
             XXX  # unhandled node type
         else:  # updating file
@@ -361,33 +370,36 @@ fs_sync.remove(dst)
             if not ignore_existing:
               if not links: XXX  # link dereference not implemented !
               link = readlink(src)
+              moved = False
               if difflink(link, dst):
-                if verbose > 0:
-                  onverbose("update", dstname)
+                if verbose > 0: onverbose("update", dstname)
                 if backup: dobackup(dst, backup_dir, bakname)
-                else: unlink(dst)
-                # XXX if dereference link then becareful of unsafe links !
-                symlink(link, dst)
-                # copy_stat(dst, src_stats) does not work on many OSes
+                moved = True if remove_source_files and softreplace(src, dst) else False
+                if not moved:
+                  if not backup: unlink(dst)
+                  # XXX if dereference link then becareful of unsafe links !
+                  symlink(link, dst)
+                  # XXX copy_stat(dst, src_stats) does not work on many OSes
               else:
                 if verbose > 1: onverbose("uptodate", dstname)
-              if remove_source_files: unlink(src)
+              if remove_source_files and not moved: unlink(src)
             else:
               if verbose > 1: onverbose("exists", dstname)
           elif stat.S_ISREG(src_stats.st_mode):
             if not ignore_existing:
               diff = difffilecontent(src, dst, src_stats, dst_stats)
+              moved = False
               if diff:
-                if verbose > 0:
-                  onverbose("update", dstname)
+                if verbose > 0: onverbose("update", dstname)
                 if backup:
                   dobackup(dst, backup_dir, bakname)
                   dst_stats = None
-                copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
-              copystat(dst, src_stats, dst_stats)
+                moved = True if remove_source_files and softreplace(src, dst) else False
+                if not moved: copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
+              if not moved: copystat(dst, src_stats, dst_stats)
               if not diff:
                 if verbose > 1: onverbose("uptodate", dstname)
-              if remove_source_files: unlink(src)
+              if remove_source_files and not moved: unlink(src)
             else:
               if verbose > 1: onverbose("exists", dstname)
           elif stat.S_ISDIR(src_stats.st_mode):
@@ -398,7 +410,7 @@ fs_sync.remove(dst)
                   if verbose > 0:
                     onverbose("update", dstname)
               if recursive:
-                fs_iterdirsdiff(rec, [src, dst], os_modules=(os_module, os_module))
+                rec(((srcroot, srcname, True), (dstroot, dstname, True), (backup_dir, bakname)))
                 if not ignore_existing:  # this condition is just for performance reasons
                   dst_stats = lstat(dst)  # a backup/creation/… may change the directory stats
               if not ignore_existing:
@@ -420,9 +432,9 @@ fs_sync.remove(dst)
         dst_stats = lstat(dst)  # dst should always exists here
         # ignore_existing has no effect here
         if delete:  # XXX man rsync says: If the sending side detects any I/O errors, then the deletion of any files at the destination  will  be automatically  disabled
-          if stat.S_ISDIR(dst_stats.st_mode): fs_iterdirsdiff(rec, [None, dst], os_modules=(os_module, os_module))
+          if stat.S_ISDIR(dst_stats.st_mode): rec(((srcroot, srcname, False), (dstroot, dstname, True), (backup_dir, bakname)))
           if verbose > 0:
-            onverbose("delete", dstname)  # XXX before/after fs_iterdirsdiff ?
+            onverbose("delete", dstname)  # XXX before/after rec ?
           if backup_dir or not dst.endswith(suffix):
             if backup:
               try: dobackup(dst, backup_dir, bakname)
@@ -431,25 +443,25 @@ fs_sync.remove(dst)
                 raise
             else: rm(dst, dst_stats)
 
-    if as_func:
-      return sync
 
     sep = os_module.sep
+    altsep = getattr(os_module, "altsep", sep) or sep
     if isinstance(src, bytes):
       sep = os_module.fsencode(sep)
+      altsep = os_module.fsencode(altsep)
       if not isinstance(suffix, bytes): suffix = os_module.fsencode(suffix)
       #dot = b"."
     #else: dot = "."
+    def pathextend(path, *paths):
+      *paths, last = [_ for _ in (path,) + paths if _]
+      paths = [_[:-1] if _[-1:] in (sep, altsep) else _ for _ in paths] + [last]
+      return sep.join(paths)
+
+    if as_func:
+      return sync
 
     if source_directory:  # implies target_directory
-      srcroot, dstroot = src, dst
-      srcl, dstl = len(srcroot), len(dstroot)
-      if srcl: srcl += len(sep)
-      if dstl: dstl += len(sep)
-      if not isdir(src):
-        if ignore_listdir_errors: return
-        raise mkerr(NotADirectoryError, errno.ENOTDIR, "not a directory", filename=src)
-      return fs_iterdirsdiff(rec, [src, dst], os_modules=(os_module, os_module))
+      return rec(((src, sep[:0], True), (dst, sep[:0], True), (backup_dir, sep[:0])))
 
     if target_directory:
       srcroot, srcname = os_module.path.split(src)
@@ -474,18 +486,22 @@ fs_sync.remove(dst)
     kw.update(k)
     return fs_sync(src, dst, **kw)
 
+  def move(src, dst, **k):
+    kw = {"recursive": True, "remove_source_files": True, "remove_source_dirs": True}
+    kw.update(k)
+    return fs_sync(src, dst, **kw)
+
   def remove(dst, **k):
     kw = {"remove_source_files": True, "remove_source_dirs": True}
     kw.update(k)
     return fs_sync(dst, dst, **kw)
 
-  #def move(src, dst, **k):  # needs to implement a mechanism to use os_module.rename instead of copying everything
-
   fs_sync.merge = merge
   fs_sync.mirror = mirror
   fs_sync.clean = clean
+  fs_sync.move = move
   fs_sync.remove = remove
   return fs_sync
 
 fs_sync = fs_sync()
-fs_sync._required_globals = ["os", "stat", "sys", "errno", "fs_iterdirsdiff", "fs_copyfile", "fs_move", "fs_diff", "os_path_splitall"]
+fs_sync._required_globals = ["os", "stat", "sys", "errno", "fs_copyfile", "fs_move", "fs_diff", "os_path_splitall", "uniq"]

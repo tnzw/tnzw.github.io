@@ -1,4 +1,4 @@
-# fs_move.py Version 2.0.0
+# fs_move.py Version 2.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -38,6 +38,17 @@ fs_move(src, dst, **opt)
   if isinstance(dst, bytes): dstsep = src_os_module.fsencode(dstsep)
   srcsepl = len(srcsep)
 
+  def rec(curdir):
+    for name in src_os_module.listdir(curdir):
+      com = (curdir+srcsep+name)[srcl+srcsepl:]
+      cur, new = src+srcsep+com, dst+dstsep+com
+      curstat = src_os_module.lstat(cur)
+      newstat = None
+      try: newstat = dst_os_module.lstat(new)
+      except FileNotFoundError: pass
+      except OSError: raise
+      act(cur, curstat, new, newstat)
+
   def act(cur, curstat, new, newstat):
     if stat.S_ISLNK(curstat.st_mode):
       if newstat and not clobber: return
@@ -55,18 +66,17 @@ fs_move(src, dst, **opt)
         raise NotImplementedError("unhandled node " + repr(new))
       if auto_remove: src_os_module.unlink(cur)
     elif stat.S_ISDIR(curstat.st_mode):
-      if newstat and not clobber: return fs_iterdirsdiff(rec, [cur], os_modules=(src_os_module,))
+      if newstat and not clobber: return rec(cur)
       if not newstat:
         try: src_os_module.rename(cur, new)
         except OSError as err:
           if err.errno != errno.EXDEV: raise
-        else: return fs_iterdirsdiff(rec, [cur], os_modules=(src_os_module,))
+        else: return rec(cur)
         dst_os_module.mkdir(new)
       elif not stat.S_ISDIR(newstat.st_mode):
         raise IsADirectoryError(errno.EISDIR, "cannot overwrite directory " + repr(new) + " with non-directory", new)
 
-      err = fs_iterdirsdiff(rec, [cur], os_modules=(src_os_module,))
-      if err: raise err
+      rec(cur)
 
       if not newstat:
         if preserve_timestamps: dst_os_module.utime(new, (curstat.st_atime, curstat.st_mtime))
@@ -92,22 +102,10 @@ fs_move(src, dst, **opt)
     else:
       raise NotImplementedError("unhandled node " + repr(cur))
 
-  def rec(err, name, roots):
-    if err: raise err
-    curdir, = roots
-    com = (curdir+srcsep+name)[srcl+srcsepl:]
-    cur, new = src+srcsep+com, dst+dstsep+com
-    curstat = src_os_module.lstat(cur)
-    newstat = None
-    try: newstat = dst_os_module.lstat(new)
-    except OSError as err:
-      if err.errno != errno.ENOENT: raise
-    act(cur, curstat, new, newstat)
-
   srcstat = src_os_module.lstat(src)
   dststat = None
   try: dststat = dst_os_module.lstat(dst)
   except OSError as err:
     if err.errno != errno.ENOENT: raise
   act(src, srcstat, dst, dststat)
-fs_move._required_globals = ["errno", "os", "stat", "fs_iterdirsdiff", "fs_copyfile"]
+fs_move._required_globals = ["errno", "os", "stat", "fs_copyfile"]

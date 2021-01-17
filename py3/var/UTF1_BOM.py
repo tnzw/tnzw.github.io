@@ -1,0 +1,1 @@
+UTF1_BOM = b"\xf7\x64\x4c"

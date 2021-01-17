@@ -1,4 +1,4 @@
-# MemOs.py Version 1.0.1
+# MemOs.py Version 1.4.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -15,12 +15,12 @@ An os module like object that only act in memory in a virtual file system
   _fs = None
   _meta = None
   _last_ino = None
-  _last_fd = None
   _proc_fd = None
   _proc_cwd = None
   _proc_cwd_ino = None
   _umask = 0o022
   _ROOT_INO = 3
+  _FD_START = 3
 
   error = OSError
   name = None
@@ -36,12 +36,15 @@ An os module like object that only act in memory in a virtual file system
     self.path = posixpath if path is None else path
     self._fs = {self._ROOT_INO: {b".": self._ROOT_INO, b"..": self._ROOT_INO}}
     now = time.time()
-    self._meta = {self._ROOT_INO: {"st_mode": self.T_DIR | 0o755, "st_ino": self._ROOT_INO, "st_uid": int(self.uid), "st_gid": int(self.gid), "st_nlink": 1, "st_size": 4096, "st_atime": now, "st_mtime": now}}
+    self._meta = {self._ROOT_INO: {"st_mode": self.T_DIR | 0o755, "st_ino": self._ROOT_INO, "st_nlink": 1, "st_uid": int(self.uid), "st_gid": int(self.gid), "st_size": 4096, "st_atime": now, "st_mtime": now}}
     self._last_ino = self._ROOT_INO
-    self._last_fd = 3
     self._proc_cwd = (b"/",)
     self._proc_cwd_ino = (self._ROOT_INO,)
     self._proc_fd = {}
+
+  def __del__(self):
+    for fd in self._proc_fd:
+      self.close(fd)
 
   # File Names, Command Line Arguments, and Environment Variables
 
@@ -96,7 +99,13 @@ An os module like object that only act in memory in a virtual file system
     del self._proc_fd[fd]
 
   #def copy_file_range(self, src, dst, count, offset_src=None, offset_dst=None): XXX
-  #def dup(self, fd): XXX
+
+  def dup(self, fd):
+    fds = self._getcheck_fd(fd)
+    newfd = self._next_fd()
+    self._proc_fd[newfd] = fds.copy()
+    return newfd
+    
   #def dup2 XXX ?
 
   def fchmod(self, fd, mode): return self._hchmod(self._getcheck_fd(fd)["meta"], mode)
@@ -113,7 +122,7 @@ An os module like object that only act in memory in a virtual file system
     if length < 0: raise OSError(errno.EINVAL, "Invalid argument")
     fds = self._getcheck_fd(fd, fmt="reg")
     if not fds["flags"] & self.O_RDWR and not fds["flags"] & self.O_WRONLY: raise PermissionError(errno.EACCES, "Permission denied")  # not the same error as in _getcheck_fd
-    return self._htruncate(fds["data"], fds["meta"])
+    return self._htruncate(fds["data"], fds["meta"], length)
 
   def isatty(self, fd):
     self._getcheck_fd(fd)
@@ -134,28 +143,29 @@ An os module like object that only act in memory in a virtual file system
   SEEK_END = 2
 
   def open(self, path, flags, mode=0o777, *, dir_fd=None):
-    if dir_fd is not None: raise NotImplementedError()
-    p_ino, p = self._traverse(path, not_found_as_none=True)
+    p_ino, p = self._traverse(path, dir_fd=dir_fd, not_found_as_none=True)
     w,rw,a,c,t,x = (flags & getattr(self, "O_" + _) for _ in "WRONLY RDWR APPEND CREAT TRUNC EXCL".split())
     r = 0 if w or rw else 1
     if x and p_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File exists", path)
     now = time.time()
     if c:
       dir = self._fs[p_ino[-2]]
-      now = time.time()
       ino = self._next_ino()
-      data, meta = bytearray(), {"st_mode": self.T_REG | (mode & (0o777 - self._umask)), "st_uid": int(self.uid), "st_gid": int(self.gid), "st_ino": ino, "st_nlink": 1, "st_size": 0, "st_atime": now, "st_mtime": now}
+      data, meta = bytearray(), {"st_mode": self.T_REG | (mode & (0o777 - self._umask)), "st_nlink": 1, "st_uid": int(self.uid), "st_gid": int(self.gid), "st_ino": ino, "st_size": 0, "st_atime": now, "st_mtime": now}
       if p_ino[-1] is not None:
         if not stat.S_ISREG(meta["st_mode"]): raise OSError(errno.EINVAL, "Invalid argument")  # XXX I just guessed the error...
         self._hunlink(dir, p[-1], p_ino[-1], self._meta[p_ino[-1]])
       dir[p[-1]], self._fs[ino], self._meta[ino] = ino, data, meta
+      p_ino = *p_ino[:-1], ino
     else:
       if p_ino[-1] is None: raise FileNotFoundError(errno.ENOENT, "No such file or directory", path)  # XXX windows error ?
       data, meta = self._fs[p_ino[-1]], self._meta[p_ino[-1]]
-      if stat.S_ISDIR(meta["st_mode"]) and (w or rw): raise IsADirectoryError(errno.EISDIR, "Is a directory", path)  # XXX windows error ?
+      if stat.S_ISDIR(meta["st_mode"]):
+        if w or rw or t: raise IsADirectoryError(errno.EISDIR, "Is a directory", path)  # XXX windows error ?
       elif not stat.S_ISREG(meta["st_mode"]): raise OSError(errno.EINVAL, "Invalid argument")  # XXX I just guessed the error...
     fds = {
-      "data": data, "meta": meta, "path": path, "flags": flags, "seek": 0, "closed": False, "fmt": stat.S_IFMT(meta["st_mode"]),
+      "data": data, "meta": meta, "path": self.fspath(path), "flags": flags, "seek": 0, "closed": False, "fmt": stat.S_IFMT(meta["st_mode"]),
+      "traversed": (p_ino, p),  # used by dir_fd functions XXX is it a breach to go outside chroot ?
     }
     fd = self._next_fd()
     # XXX does O_TRUNC updates mtime on opening ?
@@ -186,11 +196,10 @@ An os module like object that only act in memory in a virtual file system
     # this method works with linesep = "\r\n" or one byte linesep
     if n < 0: raise OSError(errno.EINVAL, "Invalid argument")
     fds = self._getcheck_fd(fd, readable=True, fmt="reg")
-    fds = self._proc_fd[fd]
     data, meta, pos = fds["data"], fds["meta"], fds["seek"]
-    d = bytes(data[pos:n])
+    d = bytes(data[pos:pos+n])
     fds["seek"], meta["st_atime"] = pos + len(d), time.time()
-    if fds["flags"] & self.O_BINARY: return d
+    if fds["flags"] & self.O_BINARY or self.linesepb == b"\n": return d
     if self.linesepb == b"\r\n": return d.replace(b"\r", b"")
     if len(self.linesepb) == 1: return d.replace(self.linesepb, b"\n")
     raise NotImplementedError()
@@ -201,7 +210,7 @@ An os module like object that only act in memory in a virtual file system
     fds = self._getcheck_fd(fd, writable=True, fmt="reg")
     data, meta, pos = fds["data"], fds["meta"], fds["seek"]
     lstr = len(str)
-    actual_str = str if fds["flags"] & self.O_BINARY else str.replace(b"\n", self.linesepb)
+    actual_str = str if fds["flags"] & self.O_BINARY or self.linesepb == b"\n" else str.replace(b"\n", self.linesepb)
     alstr = len(actual_str)
     if fds["flags"] & self.O_APPEND: pos = len(data)
     size = max(pos+alstr, len(data))
@@ -229,13 +238,11 @@ An os module like object that only act in memory in a virtual file system
 
   def chmod(self, path, mode, *, dir_fd=None, follow_symlinks=True):
     if isinstance(path, int): return self.fchmod(path, uid, gid)
-    if dir_fd is not None: raise NotImplementedError()
-    return self._hchmod(self._meta[self._traverse(path, follow_symlinks=follow_symlinks)[0][-1]], mode)
+    return self._hchmod(self._meta[self._traverse(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)[0][-1]], mode)
 
   def chown(self, path, uid, gid, *, dir_fd=None, follow_symlinks=True):
     if isinstance(path, int): return self.fchown(path, uid, gid)
-    if dir_fd is not None: raise NotImplementedError()
-    return self._hchown(self._meta[self._traverse(path, follow_symlinks=follow_symlinks)[0][-1]], uid, gid)
+    return self._hchown(self._meta[self._traverse(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)[0][-1]], uid, gid)
 
   def chroot(self, path):
     # it is impossible to go back to previous root ;)
@@ -244,11 +251,11 @@ An os module like object that only act in memory in a virtual file system
     if not stat.S_ISDIR(meta["st_mode"]): raise NotADirectoryError(errno.ENOTDIR, "Not a directory", path)  # chroot not available on windows
     for i, cwd_ino in enumerate(self._proc_cwd_ino):
       if cwd_ino == ino:
-        self._proc_cwd_ino, self._proc_cwd = self._proc_cwd_ino[i:], self._proc_cwd[i:]
+        self._proc_cwd_ino, self._proc_cwd = self._proc_cwd_ino[i:], (b"/",) + self._proc_cwd[i+1:]
         return
     self._proc_cwd_ino, self._proc_cwd = (ino,), (b"/",)
 
-  #def fchdir(self, fd)
+  def fchdir(self, fd): self._proc_cwd_ino, self._proc_cwd = self._getdirfdtraversed(fd)
 
   def getcwd(self): return self.fsdecode(self.getcwdb())
   def getcwdb(self): return self.path.join(*self._proc_cwd)
@@ -258,11 +265,10 @@ An os module like object that only act in memory in a virtual file system
   def lchown(self, path, uid, gid): return self.chown(path, uid, gid, follow_symlinks=False)
 
   def link(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None, follow_symlinks=True):
-    if src_dir_fd is not None or dst_dir_fd is not None: raise NotImplementedError()
-    s_ino, s = self._traverse(src, follow_symlinks=follow_symlinks, error_path=src, error_dst=dst)
+    s_ino, s = self._traverse(src, dir_fd=src_dir_fd, follow_symlinks=follow_symlinks, error_path=src, error_dst=dst)
     s_meta = self._meta[s_ino[-1]]
     if stat.S_ISDIR(s_meta["st_mode"]): raise PermissionError(errno.EPERM, "Permission denied", src, 5, dst)
-    d_ino, d = self._traverse(dst, follow_symlinks=False, not_found_as_none=True, error_path=src, error_dst=dst)
+    d_ino, d = self._traverse(dst, dir_fd=dst_dir_fd, follow_symlinks=False, not_found_as_none=True, error_path=src, error_dst=dst)
     if d_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File exists", src, 183, dst)
     dir = self._fs[d_ino[-2]]
     s_meta["st_nlink"], dir[d[-1]] = s_meta["st_nlink"] + 1, s_ino[-1]
@@ -274,45 +280,39 @@ An os module like object that only act in memory in a virtual file system
     if isinstance(path, str): return [self.fsdecode(_) for _ in dir if _ not in (b"..", b".", b"")]
     return [_ for _ in dir if _ not in (b"..", b".", b"")]
 
-  def lstat(self, *a, **k): return self.stat(*a, follow_symlinks=False, **k)
+  def lstat(self, path, *, dir_fd=None): return self.stat(path, dir_fd=dir_fd, follow_symlinks=False)
 
   def mkdir(self, path, mode=0o777, *, dir_fd=None):
-    if dir_fd is not None: raise NotImplementedError()
-    p_ino, p = self._traverse(path, not_found_as_none=True)
+    p_ino, p = self._traverse(path, dir_fd=dir_fd, not_found_as_none=True)
     if p_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File already exists", path, 183)
     dir = self._fs[p_ino[-2]]
     newdirino = self._next_ino()
     newdir = {b".": newdirino, b"..": p_ino[-2]}
     now = time.time()
-    newmeta = {"st_mode": self.T_DIR | (mode & (0o777 - self._umask)), "st_uid": int(self.uid), "st_gid": int(self.gid), "st_ino": newdirino, "st_nlink": 1, "st_size": 4096, "st_atime": now, "st_mtime": now}
+    newmeta = {"st_mode": self.T_DIR | (mode & (0o777 - self._umask)), "st_uid": int(self.uid), "st_nlink": 1, "st_gid": int(self.gid), "st_ino": newdirino, "st_size": 4096, "st_atime": now, "st_mtime": now}
     dir[p[-1]], self._fs[newdirino], self._meta[newdirino] = newdirino, newdir, newmeta
 
-  #def makedirs(self, mode=0o777, exist_ok=False):
-  #  XXX os_makedirs(name, mode=0o777, exist_ok=False, *, os_module=None)
-  #  return os_makedirs(name, mode=mode, exist_ok=exist_ok, os_module=self)
+  def makedirs(self, name, mode=0o777, exist_ok=False): return os_makedirs(name, mode=mode, exist_ok=exist_ok, os_module=self)
 
   def readlink(self, path, *, dir_fd=None):
-    if dir_fd is not None: raise NotImplementedError()
-    p_ino, _ = self._traverse(path, follow_symlinks=False)
+    p_ino, _ = self._traverse(path, dir_fd=dir_fd, follow_symlinks=False)
     p_meta = self._meta[p_ino[-1]]
     if not stat.S_ISLNK(p_meta["st_mode"]): raise OSError(errno.EINVAL, "Invalid argument", path)  # XXX windows error ?
     return self._hreadlink(self._fs[p_ino[-1]], reflect_type=path)
 
   def remove(self, path, *, dir_fd=None):
-    if dir_fd is not None: raise NotImplementedError()
-    p_ino, p = self._traverse(path, follow_symlinks=False)
+    p_ino, p = self._traverse(path, dir_fd=dir_fd, follow_symlinks=False)
     #if not p_ino[1:2]: raise OSError(errno.EBUSY, "Device or resource busy", path, 32)  # PermissionError on windows
     _, meta = self._fs[p_ino[-1]], self._meta[p_ino[-1]]
     if stat.S_ISDIR(meta["st_mode"]): raise IsADirectoryError(errno.EISDIR, "Is a directory", path, 5)  # PermissionError on windows
     self._hunlink(self._fs[p_ino[-2]], p[-1], p_ino[-1], meta)
 
-  #def removedirs(self, name): XXX
+  def removedirs(self, name): return os_removedirs(name, os_module=self)
 
   def rename(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None):
     # windows cannot replace, but unix can
-    if src_dir_fd is not None or dst_dir_fd is not None: raise NotImplementedError()
-    s_ino, s = self._traverse(src, follow_symlinks=False, not_found_as_none=False, error_path=src, error_dst=dst)
-    d_ino, d = self._traverse(dst, follow_symlinks=False, not_found_as_none=True , error_path=src, error_dst=dst)
+    s_ino, s = self._traverse(src, dir_fd=src_dir_fd, follow_symlinks=False, not_found_as_none=False, error_path=src, error_dst=dst)
+    d_ino, d = self._traverse(dst, dir_fd=dst_dir_fd, follow_symlinks=False, not_found_as_none=True , error_path=src, error_dst=dst)
     s_dir, d_dir = self._fs[s_ino[-2]], self._fs[d_ino[-2]]
     if d_ino[-1] is None:
       d_dir[d[-1]] = s_dir[s[-1]]
@@ -333,8 +333,7 @@ An os module like object that only act in memory in a virtual file system
   replace = rename
 
   def rmdir(self, path, *, dir_fd=None):
-    if dir_fd is not None: raise NotImplementedError()
-    p_ino, p = self._traverse(path, follow_symlinks=False)
+    p_ino, p = self._traverse(path, dir_fd=dir_fd, follow_symlinks=False)
     #if p_ino[-1] in self._proc_cwd_ino: raise OSError(errno.EBUSY, "Device or resource busy", path, 32)  # PermissionError on windows
     rmdir, meta = self._fs[p_ino[-1]], self._meta[p_ino[-1]]
     if not stat.S_ISDIR(meta["st_mode"]): raise NotADirectoryError(errno.ENOTDIR, "Not a directory", path, 267)
@@ -347,12 +346,11 @@ An os module like object that only act in memory in a virtual file system
 
   def stat(self, path, *, dir_fd=None, follow_symlinks=True):
     if isinstance(path, int): return self.fstat(path)
-    if dir_fd is not None: raise NotImplementedError()
-    return self.stat_result(**self._meta[self._traverse(path, follow_symlinks=follow_symlinks)[0][-1]])
+    return self.stat_result(**self._meta[self._traverse(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)[0][-1]])
 
   #windows ex: os.stat_result(st_mode=16895, st_ino=4222124650991797, st_dev=813348024, st_nlink=1, st_uid=0, st_gid=0, st_size=20480, st_atime=1601902565, st_mtime=1601902565, st_ctime=1593107313)
   class stat_result(tuple):  # same as : os_stat_result = collections.namedtuple("os_stat_result", fields, defaults=(0,)*len(fields))
-    _fields = tuple("st_mode, st_ino, st_nlink, st_size, st_atime, st_mtime".split(", "))
+    _fields = tuple("st_mode, st_ino, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime".split(", "))
     def __new__(cls, *a, **k):
       la = len(a)
       return tuple.__new__(cls, ((a[i] if i < la else k.get(field, 0)) for i, field in enumerate(cls._fields)))
@@ -370,8 +368,7 @@ An os module like object that only act in memory in a virtual file system
 
   def symlink(self, src, dst, target_is_directory=False, *, dir_fd=None):
     # target_is_directory is ignored on non-windows platforms
-    if dir_fd is not None: raise NotImplementedError()
-    d_ino, d = self._traverse(dst, follow_symlinks=False, not_found_as_none=True, error_path=src, error_dst=dst)
+    d_ino, d = self._traverse(dst, dir_fd=dir_fd, follow_symlinks=False, not_found_as_none=True, error_path=src, error_dst=dst)
     if d_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File exists", src, 183, dst)  # XXX windows error is 183 ?
     dir = self._fs[d_ino[-2]]
     n = self.fsencode(src)
@@ -387,12 +384,11 @@ An os module like object that only act in memory in a virtual file system
     if isinstance(path, int): return self.ftruncate(path, length)
     if length < 0: return
     ino = self._traverse(path)[0][-1]
-    return self._htruncate(self._fs[ino], self._meta[ino])
+    return self._htruncate(self._fs[ino], self._meta[ino], length)
 
   unlink = remove
 
   def utime(self, path, times=None, *, ns=None, dir_fd=None, follow_symlinks=True):
-    if dir_fd is not None: raise NotImplementedError()
     if times is not None and ns is not None: raise ValueError("utime: you may specify either 'times' or 'ns' but not both")
     if ns is not None: times = (int(ns[0]) / 1000000000, int(ns[1]) / 1000000000)  # ns is nanosecond
     if times is None:
@@ -401,14 +397,16 @@ An os module like object that only act in memory in a virtual file system
     if isinstance(path, int):
       meta = self._getcheck_fd(path)["meta"]
     else:
-      meta = self._meta[self._traverse(path, follow_symlinks=follow_symlinks)[0][-1]]
-    if not isinstance(times[0], (int, float)) or not isinstance(times[1], (int, float)): TypeError("an integer is required")
+      meta = self._meta[self._traverse(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)[0][-1]]
+    if not isinstance(times[0], (int, float)) or not isinstance(times[1], (int, float)): raise TypeError("an integer is required")
     meta["st_atime"], meta["st_mtime"] = times[0:2]
 
-  #def walk(self, top, topdown=True, onerror=True, followlinks=False): XXX
-  #def fwalk(self, top=".", topdown=True, onerror=True, *, follow_symlinks=False, dir_fd=None): XXX
+  def walk(self, top, topdown=True, onerror=True, followlinks=False):
+    return os_walk(top, topdown=topdown, onerror=onerror, followlinks=followlinks, os_module=self)
+  def fwalk(self, top=".", topdown=True, onerror=True, *, follow_symlinks=False, dir_fd=None):
+    return os_fwalk(top, topdown=topdown, onerror=onerror, follow_symlinks=follow_symlinks, dir_fd=dir_fd, os_module=self)
 
-  supports_dir_fd = ()
+  supports_dir_fd = (chmod, chown, fwalk, link, lstat, mkdir, open, readlink, remove, rename, rmdir, stat, symlink, unlink, utime)
   supports_effective_ids = ()
   supports_fd = (chmod, chown, stat, truncate, utime)
   supports_follow_symlinks = (chmod, chown, stat, utime, link)
@@ -457,20 +455,23 @@ An os module like object that only act in memory in a virtual file system
 
   # Helpers
 
-  def _traverse(self, path, cwd_ino=None, cwd=None, *, follow_symlinks=True, follow_dots=False, not_found_as_none=False, error_path=None, error_dst=None):
+  def _traverse(self, path, cwd_ino=None, cwd=None, *, dir_fd=None, follow_symlinks=True, follow_dots=False, not_found_as_none=False, error_path=None, error_dst=None):
     split = os_path_split(self.fsencode(path), -1, os_module=self)
     if split[0]:  # isabs
-      cwd_ino, cwd = self._proc_cwd_ino[:1], self._proc_cwd[:1]
+      cwd_ino, cwd = self._proc_cwd_ino[:1], self._proc_cwd[:1]  # we handle only one root (eg. C:/ and D:/ are same root), so ignore split[0] root value
     else:
-      if cwd_ino is None: cwd_ino = self._proc_cwd_ino
-      if cwd is None: cwd = self._proc_cwd
+      if dir_fd is not None:
+        cwd_ino, cwd = self._getdirfdtraversed(dir_fd)
+      else:
+        if cwd_ino is None: cwd_ino = self._proc_cwd_ino
+        if cwd is None: cwd = self._proc_cwd
     l = len(split) - 2
     for i, name in enumerate(split[1:]):
       if name == b"": continue
       if not follow_dots:
         if name == b".": continue
         if name == b"..":
-          if cwd[1:]: cwd_ino, cwd = cwd_ino[:-1], cwd[:-1]
+          if cwd_ino[1:]: cwd_ino, cwd = cwd_ino[:-1], cwd[:-1]
           continue
       cwn, cwm = self._fs[cwd_ino[-1]], self._meta[cwd_ino[-1]]
       if not stat.S_ISDIR(cwm["st_mode"]): raise NotADirectoryError(errno.ENOTDIR, "Not a directory", path if error_path is None else error_path, 3, error_dst)  # FileNotFoundError on windows
@@ -493,9 +494,10 @@ An os module like object that only act in memory in a virtual file system
     self._last_ino = i
     return i
 
-  def _next_fd(self):
-    self._last_fd = self._last_fd + 1
-    return self._last_fd
+  def _next_fd(self):  # XXX not cocurrent safe
+    fd = self._FD_START
+    while fd in self._proc_fd: fd += 1
+    return fd
 
   def _getcheck_fd(self, fd, readable=False, writable=False, fmt=None):
     ok, fds = True, None
@@ -513,6 +515,15 @@ An os module like object that only act in memory in a virtual file system
     if ok: return fds
     raise OSError(errno.EBADF, "Bad file descriptor")
 
+  def _getdirfdtraversed(self, fd):
+    cwd_ino, cwd = self._getcheck_fd(fd, readable=True, fmt="dir")["traversed"]
+    for i, ino in enumerate(self._proc_cwd_ino):
+      if cwd_ino[0] == ino:
+        if i == 0: return cwd_ino, cwd
+        cwd_ino, cwd = cwd_ino[i:], (b"/",) + cwd[i+1:]
+        return cwd_ino, cwd
+    raise FileNotFoundError(errno.ENOENT, "No such file or directory")  # out of chroot
+
   def _hchmod(self, meta, mode):
     meta["st_mode"] = (meta["st_mode"] & 0xFFFFFE00) | (mode & 0o777)  # is 0xFFFFFE00 ok ? Do not use umask
 
@@ -527,7 +538,7 @@ An os module like object that only act in memory in a virtual file system
     if isinstance(reflect_type, str): return self.fsdecode(data)
     return data
 
-  def _htruncate(self, data, meta):
+  def _htruncate(self, data, meta, length):
     ldata = len(data)
     now = time.time()
     if ldata < length: data[ldata:], meta["st_size"], meta["st_atime"], meta["st_mtime"] = b"\x00" * (length - ldata), length, now, now
@@ -543,4 +554,4 @@ An os module like object that only act in memory in a virtual file system
       del self._fs[ino]
       del self._meta[ino]
 
-MemOs._required_globals = ["posixpath", "errno", "time", "stat", "os_fspath", "os_path_split", "FileIO", "convert_open_mode_to_flags"]
+MemOs._required_globals = ["posixpath", "errno", "time", "stat", "convert_open_mode_to_flags", "os_fspath", "os_fwalk", "os_makedirs", "os_removedirs", "os_walk", "os_path_split", "FileIO"]

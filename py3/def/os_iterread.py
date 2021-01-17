@@ -16,7 +16,7 @@ ex: os_iterread(fd, length=4096, size=1024)
   size => None or < 0 : use the default maximum chunk size to read
                     0 : read no data
                   > 0 : maximum chunk size to read
-  os_module => None : the module to use to act on src (defaults to os module)
+  os_module => None : the module to use to act on fd (defaults to os module)
                       required os.read
 """
   if os_module is None: os_module = os

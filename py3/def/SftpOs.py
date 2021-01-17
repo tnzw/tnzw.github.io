@@ -1,4 +1,4 @@
-# SftpOs.py Version 1.0.0
+# SftpOs.py Version 1.0.1
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -219,4 +219,4 @@ class SftpOs(object):
   def supports_fd(self): return ()
   @property
   def supports_follow_symlinks(self): return (stat,)
-SftpOs._required_globals = ["posixpath", "os_path", "convert_open_flags_to_mode"]
+SftpOs._required_globals = ["posixpath", "os_fspath", "convert_open_flags_to_mode"]

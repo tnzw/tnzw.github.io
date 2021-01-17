@@ -166,6 +166,29 @@ def test_fs_sync_4_delete_folder_sync_archive(**K):
       else:
         assert_notequal(lstat("bak/dst"), None)
         assert_equal(lstat("bak/dst/a"  ), orig_src_a_stat )
+#       ^
+# XXX random error ? it occured on windows
+#     look at mtime below.
+# TESTING test_fs_sync_4_delete_folder_sync_archive_backup_dir_delete
+# Exception in thread Thread-63:
+# Traceback (most recent call last):
+#   File "C:\Users\tc\AppData\Local\Programs\Python\Python38-32\lib\threading.py", line 932, in _bootstrap_inner
+#     self.run()
+#   File "C:\Users\tc\AppData\Local\Programs\Python\Python38-32\lib\threading.py", line 1254, in run
+#     self.function(*self.args, **self.kwargs)
+#   File "D:\tc\py3\pythoncustom.tester.py", line 8384, in sub
+#     fn()
+#   File "D:\tc\py3\pythoncustom.tester.py", line 6953, in test_fs_sync_4_delete_folder_sync_archive_backup_dir_delete
+#     return test_fs_sync_4_delete_folder_sync_archive_backup_dir(**K)
+#   File "D:\tc\py3\pythoncustom.tester.py", line 6944, in test_fs_sync_4_delete_folder_sync_archive_backup_dir
+#     return test_fs_sync_4_delete_folder_sync_archive(**K)
+#   File "D:\tc\py3\pythoncustom.tester.py", line 6784, in test
+#     return fn(*a,**k)
+#   File "D:\tc\py3\pythoncustom.tester.py", line 6934, in test_fs_sync_4_delete_folder_sync_archive
+#     assert_equal(lstat("bak/dst/a"  ), orig_src_a_stat )
+#   File "D:\tc\py3\pythoncustom.tester.py", line 2142, in assert_equal
+#     assert a == b, str(message) + str(info)
+# AssertionError: {'gid': 0, 'mode': '0o40777', 'mtime': 1607343409, 'size': 0, 'uid': 0} != {'gid': 0, 'mode': '0o40777', 'mtime': 1607343408, 'size': 0, 'uid': 0}
         assert_equal(lstat("bak/dst/a/b"), orig_src_ab_stat)
     else:
       assert_equal(lstat("bak/a"), None)
@@ -189,3 +212,30 @@ def test_fs_sync_4_delete_folder_sync_archive_backup_dir_delete(**K):
 # XXX continue with
 # new file where there was a folder before & merge
 # replace file by folder & merge
+
+@fs_sync_tester
+def test_fs_sync_5_move_folder():
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  inos = \
+    os.lstat("src"        ).st_ino,\
+    os.lstat("src/a"      ).st_ino,\
+    os.lstat("src/a"      ).st_ino,\
+    os.lstat("src/a/b"    ).st_ino,\
+    os.lstat("src/a/b/c"  ).st_ino,\
+    os.lstat("src/a/b/c/f").st_ino,\
+    os.lstat("src/a/b/e"  ).st_ino,\
+    os.lstat("src/a/d"    ).st_ino
+  fs_sync.move("src", "lol")
+  assert_equal(inos[0], os.lstat("lol"        ).st_ino)
+  assert_equal(inos[1], os.lstat("lol/a"      ).st_ino)
+  assert_equal(inos[2], os.lstat("lol/a"      ).st_ino)
+  assert_equal(inos[3], os.lstat("lol/a/b"    ).st_ino)
+  assert_equal(inos[4], os.lstat("lol/a/b/c"  ).st_ino)
+  assert_equal(inos[5], os.lstat("lol/a/b/c/f").st_ino)
+  assert_equal(inos[6], os.lstat("lol/a/b/e"  ).st_ino)
+  assert_equal(inos[7], os.lstat("lol/a/d"    ).st_ino)
+
+#@fs_sync_tester
+#def test_fs_sync_x_remove_source_non_empy_folder():
+#  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+#  fs_sync("src", "dst", remove_source_dirs=True)  # XXX it currently raising, what's the expected behavior ?

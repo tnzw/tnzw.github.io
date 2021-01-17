@@ -1,4 +1,4 @@
-# byteprefix_dd_parseint.py Version 1.0.1
+# byteprefix_dd_parseint.py Version 1.0.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -14,4 +14,4 @@ byteprefix_dd_parseint("1000kB") -> 1000000
   m = re.match("^\\s*([-+]?)([0-9]+)(xM|[kMGTPEZY]B|[cwbBKMGTPEZY]|)\\s*$", str(string))
   if m: return byteprefix_dd_multiplyint(int(m.group(1) + m.group(2)), m.group(3))
   raise ValueError("invalid litteral for byteprefix_dd_parseint(): " + repr(string))
-byteprefix_dd_parseint._required_globals = ["byteprefix_dd_multiplyint"]
+byteprefix_dd_parseint._required_globals = ["re", "byteprefix_dd_multiplyint"]
