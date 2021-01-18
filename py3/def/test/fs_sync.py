@@ -26,7 +26,8 @@ def test_fs_sync_1_first_sync_archive(**K):
   K.setdefault("archive", True)
   lstat = fs_sync_soft_lstat
   tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
-  fs_sync("src", "dst", **K)
+  def assert_path_does_not_start_with_slash(_, path, *a): assert_notequal(path[:1].replace("\\", "/"), "/")
+  fs_sync("src", "dst", verbose=1, onverbose=assert_path_does_not_start_with_slash, **K)
   if K.get("target_directory"):
     assert_equal(lstat("src/a"      ), lstat("dst/src/a"      ))
     assert_equal(lstat("src/a"      ), lstat("dst/src/a"      ))

@@ -1,4 +1,4 @@
-# fs_sync.py Version 1.5.2
+# fs_sync.py Version 1.5.3
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -289,7 +289,7 @@ fs_sync.remove(dst, **kw)
         raise
       g = sorted(g)  # XXX it's not mandatory to sort. Add an fs_sync parameter for this ?
       for name in g:
-        arg = ((srcroot, srcname + sep + name), (dstroot, dstname + sep + name), (backup_dir, bakname + sep + name))
+        arg = ((srcroot, srcname + (sep if srcname else sep[:0]) + name), (dstroot, dstname + (sep if dstname else sep[:0]) + name), (backup_dir, bakname + (sep if bakname else sep[:0]) + name))
         try: sync(arg)
         except OSError:
           if ignore_errors: pass
