@@ -1,4 +1,4 @@
-# AltOs.py Version 1.1.1
+# AltOs.py Version 1.1.2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -40,11 +40,10 @@ Same as os module but with:
     self.path = self.os.path if path is None else path
     self._proc_fd = {}
     if cwd is None: cwd = self.os.getcwdb()
-    if root is None: root = b""
     if umask is None: umask = 0o000
     self._umask = umask & 0o777
     self._proc_cwd = self._tuplepath(cwd).fsencode().norm()
-    self._proc_root = self._tuplepath(root).fsencode().norm()
+    self._proc_root = self._tuplepath(b"") if root is None else self._tuplepath(root).fsencode().norm()
     self._proc_mounts = {}
 
   def __del__(self):
@@ -71,7 +70,7 @@ Same as os module but with:
     p, self._umask = self._umask, 0o777 & mask
     return p
 
-  # File Object Creation  
+  # File Object Creation
 
   def fdopen(self, fd, *a, **k): return self._call_fd("fdopen", fd, *a, **k)
 
@@ -151,6 +150,7 @@ Same as os module but with:
   def chown(self, path, uid, gid, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("chown", path, mode, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
 
   def chroot(self, path):
+    if not path: raise FileNotFoundError(errno.ENOENT, "No such file or directory", path)
     abspath = self._abspath(path)
     try: common = self._proc_cwd.commonpath((abspath,))
     except ValueError: cwd = self._proc_cwd[:0].root(self._proc_cwd.rootname[len(self._proc_cwd.drivename):])

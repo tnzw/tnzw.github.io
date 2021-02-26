@@ -4,8 +4,8 @@
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
 <!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.3.2
-Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
+const banner=`Page.html Version 2.3.3
+Copyright (c) 2019-2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
 and/or modify it under the terms of the Do What The Fuck You Want
@@ -21,6 +21,12 @@ const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
 const exportPreferenceKeys=["lang"];
 
 window.addEventListener('load',function(){
+  setTimeout(_=>console.log(`/!\\ STOP /!\\
+This is a browser feature intended for
+developers. If someone told you to copy-paste
+something here for whatever reason, it is a
+scam or a trick to get your information
+such as your passwords.`),500);
   window.onerror=e=>alert(e);
   function dce(tag,...args){var e=document.createElement(tag);for(let arg of args){if(Array.isArray(arg))for(let a of arg)e.appendChild(typeof a==="string"?document.createTextNode(a):a);else if(typeof arg==="string")e.innerHTML=arg;else if(arg&&typeof arg==="object")for(let k of Object.keys(arg))e.setAttribute(k,arg[k]);else if(typeof arg==="function")arg.call(e,e)}return e}
   const div=dce.bind(0,"div"),span=dce.bind(0,"span"),button=dce.bind(0,"button"),select=dce.bind(0,"select"),option=dce.bind(0,"option");
@@ -29,7 +35,7 @@ window.addEventListener('load',function(){
     hasNwJs:typeof nw!=='undefined'&&typeof require!=='undefined',
     editableExtMimeDict:{bmp:'image/bmp',css:'text/css',gif:'image/gif',htm:'text/html',html:'text/html',jpeg:'image/jpeg',jpg:'image/jpeg',js:'application/javascript',png:'image/png',svg:'image/svg+xml',svgz:'image/svg+xml',tiff:'image/tiff',txt:'text/plain',xhtml:'text/html'},
     loadableExtMimeDict:{flac:'audio/flac',ogg:'audio/ogg',opus:'audio/ogg;codec=opus',pdf:'application/pdf',mp3:'audio/mpeg',mp4:'video/mp4',wav:'audio/wav',webm:'video/webm'},//zip:'application/zip'
-    state:{},update(m){let frz=Object.freeze,o={},n={},u={};if('password' in m){this.crypto.setPassword(m.password);if((/^https?:\/\//).test(location.href)){m=Object.assign({},m,{password:!!m.password})}}for(let k of Object.keys(m||0))if(m[k]!==this.state[k]){o[k]=this.state[k];this.state[k]=n[k]=m[k];u[k]=1}if(Object.keys(n).length){let ev=frz({type:'appupdate',target:this,updates:frz(n),updated:frz(o),isupdated:frz(u)});for(let el of this.element.querySelectorAll('[onappupdate]'))new Function('event',el.getAttribute('onappupdate')).call(el,ev)}},
+    state:{},update(m){let frz=Object.freeze,o={},n={},u={};if('password' in m){this.crypto.setPassword(m.password)}for(let k of Object.keys(m||0))if(m[k]!==this.state[k]){o[k]=this.state[k];this.state[k]=n[k]=m[k];u[k]=1}if(Object.keys(n).length){let ev=frz({type:'appupdate',target:this,updates:frz(n),updated:frz(o),isupdated:frz(u)});for(let el of this.element.querySelectorAll('[onappupdate]'))new Function('event',el.getAttribute('onappupdate')).call(el,ev)}},
     promptForUpdate(){let p=prompt('Prompt');if(p){let k=(/^\s*([^\s]+)/).exec(p),v=(/^\s*[^\s]+\s(.*)$/).exec(p);if(k){app.update({[k[1]]:v&&v[1]})}}},
     display(el,yes){el.classList[yes?'remove':'add']('nodisplay')},
     escapeHTML(text){return `${text}`.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')},
