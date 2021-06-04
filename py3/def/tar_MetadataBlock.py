@@ -1,4 +1,4 @@
-# tar_MetadataBlock.py Version 1.0.2
+# tar_MetadataBlock.py Version 1.0.3
 # Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -12,6 +12,11 @@ class tar_MetadataBlock(bytearray):
   """\
 block = tar_MetadataBlock(file.read(512))
 """
+  # methods that resizes the object
+  for _ in ("__delitem__", "__iadd__", "__imul__",
+            "append", "clear", "extend", "insert", "pop", "remove"):
+    exec(f"def {_}(self, *a, **k): raise ValueError('cannot be resized')", {}, locals())
+  del _
   def __setitem__(self, key, item): return sealedarray_setitem(self, key, item, bytearray.__setitem__)
 
   def __init__(self, v=None):

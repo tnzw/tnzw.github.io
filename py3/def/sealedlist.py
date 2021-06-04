@@ -1,4 +1,4 @@
-# sealedlist.py Version 1.0.0
+# sealedlist.py Version 1.0.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -23,7 +23,7 @@ A sealedlist is a list that cannot be resized.
     if isinstance(index, slice):
       indices = index.indices(len(self))
       # check valid unpack
-      ilen = sealedlist.indices_len(indices)  # ilen = sum(1 for _ in range(*indices))
+      ilen = len(range(*indices))
       if not hasattr(value, "__len__"):
         value = list(v for i, v in zip(range(ilen + 1), value))
       vlen = len(value)
@@ -38,18 +38,3 @@ A sealedlist is a list that cannot be resized.
       return
     return list.__setitem__(self, index, value)
   def copy(self): return sealedlist(self)
-  @staticmethod
-  def indices_len(indices):
-    # indices_len(slice(0, 20, 2).indices(10)) -> 5
-    start, stop, step = indices
-    if step < 0:
-      delta = start - stop
-      if step < -1:
-        d,m = divmod(delta, -step)
-        delta = d + (1 if m else 0)
-    else:
-      delta = stop - start
-      if step > 1:
-        d,m = divmod(delta, step)
-        delta = d + (1 if m else 0)
-    return delta if delta > 0 else 0
