@@ -1,9 +1,9 @@
 this.TcBlob = (function script() {
   "use strict";
 
-  /*! TcBlob.js Version 1.1.0
+  /*! TcBlob.js Version 1.2.0
 
-      Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2019, 2021 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -17,13 +17,13 @@ this.TcBlob = (function script() {
     if (options) {
       if (options.type !== undefined) this.type = "" + options.type;
     }
-    if (chunks === undefined) return;
-    var i = 0, c = null, p = null;
+    if (chunks === undefined) chunks = [];
+    var i = 0, c = null;
     for (; i < chunks.length; i += 1) {
       if (typeof chunks[i] === "string") {
         c = new Uint8Array(new TextEncoder("utf-8").encode(chunks[i]));  // copying data
         if (c.length) { this.chunks.push(c); this.size += c.length; }
-      } else if ((p = Object.getPrototypeOf(chunks[i])) === ArrayBuffer.prototype) {
+      } else if (Object.getPrototypeOf(chunks[i]) === ArrayBuffer.prototype) {
         c = new Uint8Array(chunks[i]);  // sharing data
         if (c.length) { this.chunks.push(c); this.size += c.length; }
       } else if (ArrayBuffer.isView(chunks[i])) {
@@ -111,7 +111,7 @@ this.TcBlob = (function script() {
     return s;
   };
   TcBlob.prototype.readAsDataURL = function () {
-    return "data:" + this.type + "," + btoa(this.readAsBinaryString());  // XXX really use btoa ?
+    return "data:" + (this.type || "application/octet-stream") + ";base64," + btoa(this.readAsBinaryString());  // XXX really use btoa ?
   };
   TcBlob.prototype.readAsBinaryString = function () {
     var s = "", cc = this.chunks, cci = 0, ccl = cc.length, c = null, ci = 0, cl = 0;

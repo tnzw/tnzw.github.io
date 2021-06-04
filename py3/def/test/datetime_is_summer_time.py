@@ -1,0 +1,13 @@
+def test_datetime_is_summer_time():
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2020, 10, 25, 5, 0, 0)))
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2020, 10, 25, 2, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2020, 10, 25, 1, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2020, 10, 24, 1, 0, 0)))
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2020, 10, 26, 1, 0, 0)))
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2020, 10, 26, 1, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2021, 3, 28, 5, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2021, 3, 28, 2, 0, 0)))
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2021, 3, 28, 1, 0, 0)))
+  assert_equal(False, datetime_is_summer_time(datetime.datetime(2021, 3, 27, 1, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2021, 3, 29, 1, 0, 0)))
+  assert_equal(True, datetime_is_summer_time(datetime.datetime(2021, 3, 29, 1, 0, 0)))

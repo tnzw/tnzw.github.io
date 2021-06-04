@@ -35,18 +35,18 @@ class AltOs_mock(object):
     return getattr(self.os, name)
 
 @AltOs_tester
-def test_AltOs_mkdir():
+def test_AltOs__mkdir():
   altos = AltOs_mock()
   altos.mkdir("src/new_dir")
   assert_equal(altos.mock_get("mkdir"), 1)
 
 @AltOs_tester
-def test_AltOs_stat():
+def test_AltOs__stat():
   altos = AltOs_mock()
   altos.stat("src")
 
 @AltOs_tester
-def test_AltOs_mount():
+def test_AltOs__mount():
   altos = AltOs_mock()
   altos.mount("dst", altos)
   altos.stat("dst/src")
@@ -55,6 +55,47 @@ def test_AltOs_mount():
   altos.mkdir("src/lol")
   altos.stat("src/lol")
   altos.stat("dst/src/lol")
+
+@AltOs_tester
+def test_AltOs__chroot_getcwd_1():
+  altos = AltOs_mock()
+  altos.mkdir("src/private")
+  altos.mkdir("src/perso")
+  altos.chroot("src/private")
+  assert_equal(altos.getcwd(), f"{altos.sep}")
+@AltOs_tester
+def test_AltOs__chroot_getcwd_2():
+  altos = AltOs_mock()
+  altos.mkdir("src/private")
+  altos.mkdir("src/perso")
+  altos.chdir("src")
+  altos.chroot("private")
+  assert_equal(altos.getcwd(), f"{altos.sep}")
+@AltOs_tester
+def test_AltOs__chroot_getcwd_3():
+  altos = AltOs_mock()
+  altos.mkdir("src/private")
+  altos.mkdir("src/perso")
+  altos.chdir("src/perso")
+  altos.chroot(".")
+  assert_equal(altos.getcwd(), f"{altos.sep}")
+@AltOs_tester
+def test_AltOs__chroot_getcwd_4():
+  altos = AltOs_mock()
+  altos.mkdir("src/private")
+  altos.mkdir("src/perso")
+  altos.chdir("src/perso")
+  altos.chroot("..")
+  assert_equal(altos.getcwd(), f"{altos.sep}perso")
+@AltOs_tester
+def test_AltOs__chroot_getcwd_5():
+  altos = AltOs_mock()
+  altos.mkdir("src/private")
+  altos.mkdir("src/perso")
+  altos.chdir("src/perso")
+  altos.chroot("../private")
+  assert_equal(altos.getcwd(), altos.sep)
+
 
 # XXX test other methods*
 #     mount + chdir

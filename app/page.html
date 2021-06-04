@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
 <!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.3.3
+const banner=`Page.html Version 2.4.0
 Copyright (c) 2019-2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -423,6 +423,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
 },{passive:true,once:true});
 </script>
 <style>
+  /* A4 padding is 0.5in like in Firefox print default margin */
   .nodisplay{display:none !important}
   @media only screen and (min-width:45em){.noscreen,.printonly,.smallwindowonly{display:none !important}}
   @media only screen and (max-width:45em){.noscreen,.printonly,.largewindowonly{display:none !important}}
@@ -436,7 +437,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
     body>div[namp=app]>div[name=bars] select{width:2cm}
     body{background-color:#CCC}
     body>div[name=app]>div[name=editor]{background-color:#FFF}
-    body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:1cm;margin:1em 0 0 0}
+    body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:0.5in;margin:1em 0 0 0}
     body>div[name=app]>div[name=editor].pageformat-fullwidth{min-height:10em}
     body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(185,106,0,0.1);box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)}
   }

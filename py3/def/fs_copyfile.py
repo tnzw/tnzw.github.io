@@ -1,5 +1,5 @@
-# fs_copyfile.py Version 2.0.1
-# Copyright (c) 2019-2020 Tristan Cavelier <t.cavelier@free.fr>
+# fs_copyfile.py Version 2.0.2
+# Copyright (c) 2019-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -25,11 +25,7 @@ fs_copyfile(src, dst, flags, **opt) -> read, written
                                requires os.open, os.O_RDONLY, os.O_BINARY, os.fstat, os.read, os.close
     dst_os_module => None    : the module to use to act on dst (defaults to os module)
                                requires os.open, os.O_WRONLY, os.O_CREATE, os.O_BINARY, os.EXCL, os.chmod, os.chown, os.write
-    buffer_size => None      : Defaults to src stat.st_blksize or
-                               fs_copyfile.DEFAULT_BUFFER_SIZE or
-                               DEFAULT_BUFFER_SIZE or
-                               io.DEFAULT_BUFFER_SIZE or
-                               32Ki.
+    buffer_size => None      : Defaults to src stat.st_blksize (or 32Ki).
 """
     for read, written in fs_copyfile.iter(*a, **k): pass
     return read, written
@@ -37,39 +33,30 @@ fs_copyfile(src, dst, flags, **opt) -> read, written
            preserve_timestamps=False, preserve_mode=False, preserve_ownership=False,
            src_os_module=None, dst_os_module=None, buffer_size=None):
     """for read, written in fs_copyfile.iter(src, dst, flags, **opt): notify_progress(read, written)"""
-    def getbufsize(v):
+    def checkbufsize(v):
       if isinstance(v, int) and v > 0: return v
-      raise TypeError("invalid buffer size")
+      raise TypeError("invalid buffer size type")
     def noop(*a,**k): pass
-    
+
     if src_os_module is None: src_os_module = os
     if dst_os_module is None: dst_os_module = os
     excl = dst_os_module.O_EXCL if flags & 1 else 0
     read, written = 0, 0
 
-    src_binary = getattr(src_os_module, "O_BINARY", 0)
-    dst_binary = getattr(dst_os_module, "O_BINARY", 0)
-
-    close_src, in_fd = (False, src) if isinstance(src, int) else (True, src_os_module.open(src, src_os_module.O_RDONLY | src_binary))  # acts like "rb"
+    close_src, in_fd = (False, src) if isinstance(src, int) else (True, src_os_module.open(src, src_os_module.O_RDONLY | getattr(src_os_module, "O_BINARY", 0)))  # acts like "rb"
     try:
-      close_dst, out_fd = (False, dst) if isinstance(dst, int) else (True, dst_os_module.open(dst, dst_os_module.O_WRONLY | dst_os_module.O_CREAT | (excl or dst_os_module.O_TRUNC) | dst_binary))  # acts like "wb" or "xb"
+      close_dst, out_fd = (False, dst) if isinstance(dst, int) else (True, dst_os_module.open(dst, dst_os_module.O_WRONLY | dst_os_module.O_CREAT | (excl or dst_os_module.O_TRUNC) | getattr(dst_os_module, "O_BINARY", 0)))  # acts like "wb" or "xb"
       try:
         stats = src_os_module.fstat(in_fd)
-    
-        if buffer_size is None:
-          buffer_size = 32 * 1024
-          try: buffer_size = getbufsize(stats.st_blksize)
-          except (AttributeError, TypeError):
-            try: buffer_size = getbufsize(fs_copyfile.DEFAULT_BUFFER_SIZE)
-            except (AttributeError, TypeError):
-              try: buffer_size = getbufsize(DEFAULT_BUFFER_SIZE)
-              except (NameError, TypeError):
-                try: buffer_size = getbufsize(io.DEFAULT_BUFFER_SIZE)
-                except (NameError, AttributeError, TypeError): pass
-    
+
+        if buffer_size is None or buffer_size < 0:
+          buffer_size = 32768
+          try: buffer_size = checkbufsize(stats.st_blksize)
+          except (AttributeError, TypeError): pass
+
         if preserve_mode: dst_os_module.chmod(dst, stats.st_mode)  # XXX use fchmod ?
         if preserve_ownership: getattr(dst_os_module, "chown", noop)(dst, stats.st_uid, stats.st_gid)  # XXX use fchown ?
-    
+
         data = src_os_module.read(in_fd, buffer_size)
         read += len(data)
         yield read, written
@@ -85,12 +72,12 @@ fs_copyfile(src, dst, flags, **opt) -> read, written
             data = src_os_module.read(in_fd, buffer_size)
             read += len(data)
             yield read, written
-    
+
       finally:
         if close_dst: dst_os_module.close(out_fd)
     finally:
       if close_src: src_os_module.close(in_fd)
-    
+
     if preserve_timestamps: dst_os_module.utime(dst, (stats.st_atime, stats.st_mtime))
 
   fs_copyfile.iter = iter

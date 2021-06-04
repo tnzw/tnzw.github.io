@@ -13,8 +13,8 @@ this.sumBytesToSha256Hexadecimal = (function script() {
   function sumBytesToSha256Hexadecimal(bytes) {
     return encodeBytesToHexadecimal(sumBytesToSha256Bytes(bytes));
   }
-  sumBytesToSha256Bytes.toScript = function () { return "(" + script.toString + "())"; };
-  sumBytesToSha256Bytes._requiredGlobals = [
+  sumBytesToSha256Hexadecimal.toScript = function () { return "(" + script.toString + "())"; };
+  sumBytesToSha256Hexadecimal._requiredGlobals = [
     "sumBytesToSha256Bytes",
     "encodeBytesToHexadecimal"
   ];

@@ -1,5 +1,5 @@
-# fs_move.py Version 2.0.1
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# fs_move.py Version 2.0.2
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -23,7 +23,7 @@ fs_move(src, dst, **opt)
     clobber => True             : Overwrite existing files.
     force => False              : Remove node before copying.
     src_os_module => None       : the module to use to act on src (defaults to os module)
-                                  requires os.sep, os.fsencode, os.readlink, os.rename, os.unlink, os.rmdir, os.lstat + fs_copyfile requirements
+                                  requires os.sep, os.fsencode, os.readlink, os.replace, os.unlink, os.rmdir, os.lstat + fs_copyfile requirements
     dst_os_module => None       : the module to use to act on dst (defaults to os module)
                                   requires os.unlink, os.symlink, os.mkdir, os.utime, os.chmod, os.chown, os.lstat + fs_copyfile requirements
     buffer_size => None         : Used for copying files. Could be either an int or None.
@@ -54,10 +54,11 @@ fs_move(src, dst, **opt)
       if newstat and not clobber: return
       lnk = src_os_module.readlink(cur)
       if not newstat or stat.S_ISREG(newstat.st_mode) or stat.S_ISLNK(newstat.st_mode):
-        try: src_os_module.rename(cur, new)
-        except OSError as err:
-          if err.errno != errno.EXDEV: raise
-        else: return
+        if src_os_module is dst_os_module:
+          try: src_os_module.replace(cur, new)
+          except OSError as err:
+            if err.errno != errno.EXDEV: raise
+          else: return
         dst_os_module.unlink(new)
         dst_os_module.symlink(lnk, new)
       elif stat.S_ISDIR(newstat.st_mode):
@@ -68,10 +69,11 @@ fs_move(src, dst, **opt)
     elif stat.S_ISDIR(curstat.st_mode):
       if newstat and not clobber: return rec(cur)
       if not newstat:
-        try: src_os_module.rename(cur, new)
-        except OSError as err:
-          if err.errno != errno.EXDEV: raise
-        else: return rec(cur)
+        if src_os_module is dst_os_module:
+          try: src_os_module.replace(cur, new)
+          except OSError as err:
+            if err.errno != errno.EXDEV: raise
+          else: return rec(cur)
         dst_os_module.mkdir(new)
       elif not stat.S_ISDIR(newstat.st_mode):
         raise IsADirectoryError(errno.EISDIR, "cannot overwrite directory " + repr(new) + " with non-directory", new)
@@ -86,11 +88,12 @@ fs_move(src, dst, **opt)
     elif stat.S_ISREG(curstat.st_mode):
       if newstat and not clobber: return
       if not newstat or stat.S_ISLNK(newstat.st_mode) or stat.S_ISREG(newstat.st_mode):
-        try: src_os_module.rename(cur, new)
-        except OSError as err:
-          if err.errno != errno.EXDEV: raise
-        else: return
-        if stat.S_ISREG(newstat.st_mode) and force:
+        if src_os_module is dst_os_module:
+          try: src_os_module.replace(cur, new)
+          except OSError as err:
+            if err.errno != errno.EXDEV: raise
+          else: return
+        if newstat and stat.S_ISREG(newstat.st_mode) and force:
           # or should we use os.chmod(path, stat.S_IWRITE) ? -> remove file readonly flag
           src_os_module.unlink(cur)
         fs_copyfile(cur, new, preserve_timestamps=preserve_timestamps, preserve_mode=preserve_mode, preserve_ownership=preserve_ownership, buffer_size=buffer_size, src_os_module=src_os_module, dst_os_module=dst_os_module)

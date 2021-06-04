@@ -1,4 +1,4 @@
-def test_tuplepath_ntpath_creation():
+def test_tuplepath__ntpath_creation():
   def ntos(): pass
   ntos.path = ntpath
   ntos.fspath = os.fspath
@@ -20,7 +20,7 @@ def test_tuplepath_ntpath_creation():
     tpath = tuplepath(path, os_module=ntos)
     assert_equal(tpath.tuple, expected, info=repr(path))
 
-def test_tuplepath_ntpath_serialisation():
+def test_tuplepath__ntpath_serialisation():
   def ntos(): pass
   ntos.path = ntpath
   ntos.fspath = os.fspath
@@ -42,7 +42,7 @@ def test_tuplepath_ntpath_serialisation():
     tpath = tuplepath(path, os_module=ntos)
     assert_equal(tpath.pathname, expected, info=repr(path))
 
-def test_tuplepath_ntpath_append():
+def test_tuplepath__ntpath_append():
   def ntos(): pass
   ntos.path = ntpath
   ntos.fspath = os.fspath
@@ -89,7 +89,7 @@ def test_tuplepath_ntpath_append():
     assert_equal((tpath + append).pathname, path + append, info=(path, append, expected))
     assert_equal((append + tpath).pathname, append + path, info=(path, append, expected))
 
-def test_tuplepath_ntpath_extend():
+def test_tuplepath__ntpath_extend():
   def ntos(): pass
   ntos.path = ntpath
   ntos.fspath = os.fspath
@@ -145,7 +145,7 @@ def test_tuplepath_ntpath_extend():
     tpath = tuplepath(path, os_module=ntos)
     assert_equal(tpath.extend(extend).tuple, expected, info=(path, extend))
 
-def test_tuplepath_ntpath_extend():
+def test_tuplepath__ntpath_extend():
   def posixos(): pass
   posixos.path = posixpath
   posixos.fspath = os.fspath
@@ -199,3 +199,17 @@ def test_tuplepath_ntpath_extend():
   ):
     tpath = tuplepath(path, os_module=posixos)
     assert_equal(tpath.extend(extend).tuple, expected, info=(path, extend))
+
+def test_tuplepath__append_types():
+  assert_equal(tuplepath("one").append(b"two").pathname, "onetwo")
+  assert_equal(tuplepath(b"one").append("two").pathname, b"onetwo")
+
+def test_tuplepath__extend_types():
+  sep = os.sep
+  sepb = sep.encode()
+  assert_equal(tuplepath("one").extend(b"two").pathname, f"one{sep}two")
+  assert_equal(tuplepath(b"one").extend("two").pathname, b"one"+sepb+b"two")
+
+def test_tuplepath__mixed_type():
+  assert_equal(tuplepath(("/", b"element")).pathname, "/element")
+  assert_equal(tuplepath((b"/", "element")).pathname, b"/element")

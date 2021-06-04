@@ -119,7 +119,8 @@
     if (err) return console.error(err);
     if (text === "\uFFFD\uFFFD\x02\uFFFD\x02\uFFFD") return decode = createCodePointArrayFromUtf8CodeArrayLikeFirefox;
     if (text === "\uFFFD\uFFFD\x02\uFFFD\x02\uFFFD\uFFFD") return decode = createCodePointArrayFromUtf8CodeArrayLikeChrome;
-    console.error(new Error("No match!"));
+    //if (text === "\uFFFD\uFFFD\x02\uFFFD\x02") return decode = createCodePointArrayFromUtf8CodeArrayLikeChrome;  // this value is not acceptable, nodejs utf-8 decoding is strict, not able to decode last 2 code points, fix it in window-nodejs.js
+    console.error(new Error("No match!"), JSON.stringify(text));
     return decode = decodeUtf8ToCodePoints;
   });
 

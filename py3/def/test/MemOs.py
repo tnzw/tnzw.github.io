@@ -68,4 +68,7 @@ def test_MemOs_write():
   memos.close(w)
   assert_equal(read, b"first line\nsecond line\nthird line")
 
+for _ in ("open_read_write_close", "replace", "unlink", "listdir", "copy_file_range", "copy_file_range__linesep"):
+  exec(f"def test_MemOs__{_}(): test_os__{_}(os=MemOs())", globals(), locals())
+del _
 # XXX test other methods*

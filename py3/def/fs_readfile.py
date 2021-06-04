@@ -1,4 +1,4 @@
-# fs_readfile.py Version 1.0.0
+# fs_readfile.py Version 1.0.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -13,8 +13,8 @@ def fs_readfile(path, *, os_module=None):
   else:
     fd = None
     try:
-      fd = os_module.open(path, os_module.O_RDONLY | getattr(os_module, "O_BINARY", 0))
-      return b"".join(_ for _ in os_iterread(fd, os_module=os_module))
+      fd = os_module.open(path, os_module.O_RDONLY | getattr(os_module, "O_BINARY", 0) | getattr(os_module, "O_NOINHERIT", 0) | getattr(os_module, "O_CLOEXEC", 0))
+      return b"".join(_ for _ in os_iterread(fd, size=32768, os_module=os_module))
     finally:
       if fd is not None: os_module.close(fd)
 

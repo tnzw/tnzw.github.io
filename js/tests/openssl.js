@@ -68,14 +68,14 @@
     if (typeof desiredSalt === "string") desiredSalt = decodeHexadecimalToBytes(desiredSalt);
     if (typeof desiredIv === "string") desiredIv = decodeHexadecimalToBytes(desiredIv);
     if (typeof expectedBytes === "string") expectedBytes = decodeHexadecimalToBytes(expectedBytes);
-    test(name, 300, expectedBytes === undefined ? [message] : [expectedBytes, message], function (res, end) {
+    test("openssl " + name, 300, expectedBytes === undefined ? [message] : [expectedBytes, message], function (res, end) {
       var bytes = null;
       try {
         bytes = opensslAes256CbcEncrypt(message, password, desiredSalt, desiredIv);
         if (expectedBytes !== undefined) res.push(bytes);
         res.push(opensslAes256CbcDecrypt(bytes, password, desiredSalt, desiredIv));
       } catch (e) {
-        res.push(e);
+        res.push(e.message);
       }
       end();
     });

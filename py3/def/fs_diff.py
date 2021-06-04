@@ -1,5 +1,5 @@
-# fs_diff.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# fs_diff.py Version 1.0.1
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -47,9 +47,9 @@ fs_diff(*paths, **opt) -> True if equals, else False
   if compare_content and stat.S_ISREG(fstats.st_mode):
     fds = []
     try:
-      for i, path in enumerate(paths): fds.append(os_modules[i].open(path, os_modules[i].O_RDONLY | os_modules[i].O_BINARY))
+      for i, path in enumerate(paths): fds.append(os_modules[i].open(path, os_modules[i].O_RDONLY | getattr(os_modules[i], "O_BINARY", 0) | getattr(os_modules[i], "O_NOINHERIT", 0) | getattr(os_modules[i], "O_CLOEXEC", 0)))
       l = 0
-      for data in os_iterread(fds[0], length=max_length, os_module=os_modules[0]):
+      for data in os_iterread(fds[0], length=max_length, size=getattr(fstats, "st_blksize", None), os_module=os_modules[0]):
         data_len = len(data)
         l += data_len
         for i, fd in enumerate(fds[1:]):

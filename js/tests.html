@@ -51,21 +51,22 @@
         }, {passive: true});
       }());
     </script>
-    <script src=../js/var/loadVarScripts.js></script>
+    <script src=var/loadVarScripts.js></script>
   </head>
   <body>
     <script>console.log("--- tests.html ---");</script>
     <script>loadVarScripts({baseUrl: "../js/var/"}, "toScript", "importScriptsAsync").then(_=>console.log("toScript,importScriptsAsync loaded"));</script>
-    <script src=../js/tests/unicode.js></script>
-    <script src=../js/tests/md5.js></script>
-    <script src=../js/tests/base64.js></script>
-    <script src=../js/tests/openssl.js></script>
-    <script src=../js/tests/json.js></script>
-    <script src=../js/tests/RsvpQueue.js></script>
-    <script src=../js/tests/RsvpQueue.fromGeneratorFunction.js></script>
-    <script src=../js/tests/ChunkView.js></script>
-    <script src=../js/tests/ChunkViews.js></script>
-    <script src=../js/tests/arrayview.js></script>
-    <script src=../js/tests/tcblob.js></script>
+    <script src=tests/unicode.js></script>
+    <script src=tests/md5.js></script>
+    <script src=tests/base64.js></script>
+    <script src=tests/openssl.js></script>
+    <script src=tests/json.js></script>
+    <script src=tests/RsvpQueue.js></script>
+    <script src=tests/RsvpQueue.fromGeneratorFunction.js></script>
+    <script src=tests/ChunkView.js></script>
+    <script src=tests/ChunkViews.js></script>
+    <script src=tests/arrayview.js></script>
+    <script src=tests/tcblob.js></script>
+    <script src=tests/slice.js></script>
   </body>
 </html>

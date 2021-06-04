@@ -1,5 +1,5 @@
-# tuplepath.py Version 1.2.2
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# tuplepath.py Version 1.2.3
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -113,25 +113,26 @@ class tuplepath(tuple):
     # use join for such a result -> tuplepath("C:/a").join("D:/b") -> "D:/b"
     dec = self.os
     dec, enc = dec.fsdecode, dec.fsencode
+    fs = None
     for path in (path,) + paths:
       path = self._new(path)
       if not self:
         self = path
         continue
-      psep, paltsep = path.sep, path.altsep
-      prootname, pnames = path.rootname, path.names
+      if fs is None: fs = dec if isinstance(self.sep, str) else enc
+      psep, paltsep = fs(path.sep), path.altsep and fs(path.altsep)
+      prootname, pnames = fs(path.rootname), path.names
       if pnames:
         _, pnames = pnames[0], pnames[1:]
-        prootname += enc(_) if isinstance(prootname, bytes) else dec(_)
+        prootname += fs(_)
       if paltsep: prootname = prootname.replace(paltsep, psep)
-      names = self.names
       ssep, saltsep = self.sep, self.altsep
+      names = self.names
       if psep != ssep:
-        prootname = enc(prootname) if isinstance(ssep, bytes) else dec(prootname)
         prootname = prootname.replace(psep, ssep)
       if names:
         _, names = names[-1], names[:-1]
-        prootname = enc(_) if isinstance(prootname, bytes) else dec(_) + prootname
+        prootname = fs(_) + prootname
       if saltsep: prootname = prootname.replace(saltsep, ssep)
       prootname = tuple(prootname.split(ssep)) if prootname else ()
       self = self._new((self.rootname,) + names + prootname + pnames)
@@ -151,7 +152,7 @@ class tuplepath(tuple):
     for _ in zip(*(self.tuple,) + paths):
       for i in range(len(_) - 1):
         if _[i] != _[i + 1]: break
-      else: 
+      else:
         common_tuple = common_tuple + (_[0],)
         continue
       break
@@ -166,17 +167,19 @@ class tuplepath(tuple):
     # use join for such a result -> tuplepath("C:/a").join("D:/b") -> "D:/b"
     dec = self.os
     dec, enc = dec.fsdecode, dec.fsencode
+    fs = None
     for path in (path,) + paths:
       path = self._new(path)
       if not self:
         self = path
         continue
-      psep, paltsep = path.sep, path.altsep
-      prootname, pnames = path.rootname, path.names
+      if fs is None: fs = dec if isinstance(self.sep, str) else enc
+      psep, paltsep = fs(path.sep), path.altsep and fs(path.altsep)
+      prootname, pnames = fs(path.rootname), path.names
       if prootname[:1] in (psep, paltsep): prootname = prootname[1:]
       if pnames:
         _, pnames = pnames[0], pnames[1:]
-        prootname += enc(_) if isinstance(prootname, bytes) else dec(_)
+        prootname += fs(_)
       if paltsep: prootname = prootname.replace(paltsep, psep)
       prootname = tuple(prootname.split(psep)) if prootname else ()
       stuple = self.tuple

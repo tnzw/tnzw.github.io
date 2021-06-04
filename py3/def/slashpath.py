@@ -1,5 +1,5 @@
-# slashpath.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# slashpath.py Version 1.0.1
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -16,6 +16,14 @@ class slashpath(object):
       if isinstance(bstr, str): return bstr.replace("\\", "/")
     return bstr
   @property
+  def curdir(self): return "."
+  @property
+  def curdirb(self): return b"."
+  @property
+  def pardir(self): return ".."
+  @property
+  def pardirb(self): return b".."
+  @property
   def sep(self): return "/"
   @property
   def sepb(self): return b"/"
@@ -23,6 +31,10 @@ class slashpath(object):
   def altsep(self): return "\\" if os.name == "nt" else None
   @property
   def altsepb(self): return b"\\" if os.name == "nt" else None
+  @property
+  def extsep(self): return "."
+  @property
+  def extsepb(self): return b"."
   def abspath     (self, *a, **k): return self._backslashed(os.path.abspath     (*a, **k))
   def basename    (self, *a, **k): return self._backslashed(os.path.basename    (*a, **k))
   def commonpath  (self, *a, **k): return self._backslashed(os.path.commonpath  (*a, **k))

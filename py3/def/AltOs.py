@@ -1,12 +1,12 @@
-# AltOs.py Version 1.1.2
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# AltOs.py Version 1.1.5
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
-class AltOs(object):  # XXX TEST THE WHOLE CLASS !
+class AltOs(object):
   """\
 Same as os module but with:
 - fsdecode uses str.decode("UTF-8", "strict") on every platform
@@ -154,7 +154,9 @@ Same as os module but with:
     abspath = self._abspath(path)
     try: common = self._proc_cwd.commonpath((abspath,))
     except ValueError: cwd = self._proc_cwd[:0].root(self._proc_cwd.rootname[len(self._proc_cwd.drivename):])
-    else: cwd = self._proc_cwd[len(common):].root(self._proc_cwd.sep).norm()
+    else:
+      if abspath == common: cwd = self._proc_cwd[len(common):].root(self._proc_cwd.sep).norm()
+      else: cwd = self._proc_cwd.root().root(self._proc_cwd.sep)
     newroot = self._realpath(abspath)
     self._proc_root, self._proc_cwd = newroot, cwd
 
@@ -192,7 +194,10 @@ Same as os module but with:
     for mos in self._proc_mounts.values(): mos.sync()
   def truncate(self, path, length): return self._call_pathorfd("truncate", path, length)
   def unlink(self, path, *, dir_fd=None): return self._call_path("unlink", path, dir_fd=dir_fd)
-  def utime(self, path, times=None, *, ns=None, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("utime", path, times=times, ns=ns, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+  def utime(self, *a, **k):
+    def param_checker(path, times=None, *, ns=None, dir_fd=None, follow_symlinks=True): pass
+    param_checker(*a, **k)  # to avoid -> ValueError: utime: you may specify either 'times' or 'ns' but not both
+    return self._call_pathorfd("utime", *a, **k)
   def walk(self, top, topdown=True, onerror=True, followlinks=False):
     return os_walk(top, topdown=topdown, onerror=onerror, followlinks=followlinks, os_module=self)
   def fwalk(self, top=".", topdown=True, onerror=True, *, follow_symlinks=False, dir_fd=None):
@@ -287,8 +292,9 @@ Same as os module but with:
 
   def _call_path(self, *a, dir_fd=None, **k):
     method, path = a[:2]
+    path = self.fspath(path)
     subpath, os = self._traverse(path, dir_fd=dir_fd)
-    if not isinstance(path, bytes): subpath = subpath.fsdecode()
+    if isinstance(path, str): subpath = subpath.fsdecode()
     return getattr(os, method)(subpath.pathname, *a[2:], **k)
 
   def _call_pathorfd(self, *a, dir_fd=None, **k):
@@ -298,11 +304,12 @@ Same as os module but with:
 
   def _call_srcdst(self, *a, dir_fd=None, src_dir_fd=None, dst_dir_fd=None, **k):
     method, src, dst = a[:3]
+    src, dst = self.fspath(src), self.fspath(dst)
     subsrc, ossrc = self._traverse(src, dir_fd=src_dir_fd, error_path=src, error_dst=dst)
     subdst, osdst = self._traverse(dst, dir_fd=dst_dir_fd, error_path=src, error_dst=dst)
     if ossrc is not osdst: raise OSError(errno.EXDEV, "Invalid cross-device link", src, 17, dst)
-    if not isinstance(src, bytes): subsrc = subsrc.fsdecode()
-    if not isinstance(dst, bytes): subdst = subdst.fsdecode()
+    if isinstance(src, str): subsrc = subsrc.fsdecode()
+    if isinstance(dst, str): subdst = subdst.fsdecode()
     return getattr(ossrc, method)(subsrc.pathname, subdst.pathname, *a[3:], **k)
 
   def _convert_lseek_how(self, how, os):

@@ -1,7 +1,7 @@
 this.slice = (function script() {
   "use strict";
 
-  /*! slice.js Version 1.0.0
+  /*! slice.js Version 1.0.1
 
       Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
@@ -36,40 +36,41 @@ this.slice = (function script() {
   slice.prototype.stop = null;
   slice.prototype.step = null;
   slice.prototype.getLength = function (len) {
+    // S.getLength(len) -> <int32|BigInt>length
     function toint(v) { return typeof v === "bigint" ? v : v|0 }
-    function cast(v,m) { return typeof m === "bigint" ? BigInt(v) : v|0 }
-    var indices = this.indices(len),
+    function cast(v, m) { return typeof m === "bigint" ? BigInt(v) : v|0 }
+    var indices = this.indices(len),  // throws if step is 0 or if len is < 0
         start = indices[0],
         stop = indices[1],
         step = indices[2],
         delta, d, m,
-        _0 = cast(0, start),
-        _1 = cast(1, start);
+        _0 = cast(0, len),
+        _1 = cast(1, len);
     if (step < _0) {
       delta = start - stop;
       if (step < _1) {
         d = toint(delta / -step);
-        m = toint(delta % -step);
+        m = delta % -step;
         delta = d + (m ? _1 : _0);
       }
-    } else {
+    } else {  // step is never 0 here
       delta = stop - start;
       if (step > _1) {
-        d = toint(delta / -step);
-        m = toint(delta % -step);
+        d = toint(delta / step);
+        m = delta % step;
         delta = d + (m ? _1 : _0);
       }
     }
     return delta > _0 ? delta : _0;
   };
   slice.prototype.indices = function (len) {
-    // S.indices(len) -> (start, stop, stride)
+    // S.indices(len) -> <int32|BigInt>(start, stop, stride)
     // Assuming a sequence of length len, calculate the start and stop
     // indices, and the stride length of the extended slice described by
     // S. Out of bounds indices are clipped in a manner consistent with the
     // handling of normal slices.
     function toint(v) { return typeof v === "bigint" ? v : v|0 }
-    function cast(v,m) { return typeof m === "bigint" ? BigInt(v) : v|0 }
+    function cast(v, m) { return typeof m === "bigint" ? BigInt(v) : v|0 }
     function isnull(v) { return v === null || v === undefined }
     var start = this.start,
         stop = this.stop,
@@ -77,14 +78,15 @@ this.slice = (function script() {
         _0 = cast(0, len),
         _1 = cast(1, len);
     len = toint(len);
+    if (len < _0) throw new TypeError("length should not be negative")
     if (isnull(step)) step = _1;
-    else if (step === _0 || step === 0) throw new TypeError("slice step cannot be zero")
+    else if ((step = cast(step, len)) === _0) throw new TypeError("slice step cannot be zero")
     if (isnull(start)) start = step < _0 ? len - _1 : _0;
-    else if (start >= len) start = step < _0 ? len - _1 : len;
+    else if ((start = cast(start, len)) >= len) start = step < _0 ? len - _1 : len;
     else if (start < -len) start = step < _0 ? -_1 : _0;
     else if (start < _0) start += len;
     if (isnull(stop)) stop = step < _0 ? -_1 : len;
-    else if (stop >= len) stop = step < _0 ? len - _1 : len;
+    else if ((stop = cast(stop, len)) >= len) stop = step < _0 ? len - _1 : len;
     else if (stop < -len) stop = step < _0 ? -_1 : _0;
     else if (stop < _0) stop += len;
     return [start, stop, step]

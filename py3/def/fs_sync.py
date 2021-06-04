@@ -1,13 +1,21 @@
-# fs_sync.py Version 1.5.3
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# fs_sync.py Version 1.8.1
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
+# TODO remove automatic inplace file update and add these options
+#   inplace              update destination files in-place
+#   temp_dir=PATH        create temporary files in directory DIR
+# TODO add these options
+#   copy_dest=PATH       ... and include copies of unchanged files
+#   link_dest=PATH       hardlink to files in PATH when unchanged
+# TODO add this option if possible
+#   hard_link            preserve hard links
 def fs_sync():
-  def fs_sync(src, dst, *, source_directory=None, target_directory=None, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, update=None, dirs=None, links=None, perms=None, executability=None, chmod=None, owner=None, group=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, force=None, chown=None, size_only=None, modify_window=None, exclude=None, include=None, verbose=None, onverbose=None, ignore_errors=None, ignore_backup_delete_errors=None, ignore_listdir_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
+  def fs_sync(src, dst, *, source_directory=None, target_directory=None, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, update=None, dirs=None, links=None, perms=None, executability=None, chmod=None, owner=None, group=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, force=None, chown=None, size_only=None, times_only=None, modify_window=None, src_time_offset=None, exclude=None, include=None, file_matcher=None, verbose=None, onverbose=None, ignore_errors=None, ignore_backup_delete_errors=None, ignore_listdir_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
     """\
 fs_sync(src, dst, **opt)
 
@@ -27,7 +35,7 @@ fs_sync(src, dst, **opt)
     backup               make backups (see suffix & backup_dir)
                          backup files are overwritten
     backup_dir=PATH      make backups into hierarchy based in backup_dir
-                         behavior is different from original rsync --backup-dir (where --backup-dir=bak points to dst+"/bak")
+                         /!\\ behavior is different from original rsync --backup-dir (where --backup-dir=bak points to dst+"/bak")
                          here, backup_dir points to an external dir
     suffix=SUFFIX        backup suffix (default ~ w/o backup_dir)
     update               skip files that are newer on the receiver
@@ -50,9 +58,12 @@ fs_sync(src, dst, **opt)
     force                force deletion of dirs even if not empty (useless for the moment)
     chown=(UID,GID)      affect file and directory username and groupname
     size_only            skip files that match in size
+    times_only           skip files that match in mtime
     modify_window=NUM    compare mod-times with reduced accuracy
+    src_time_offset=NUM  use src times with additional seconds
     exclude=FUNC         exclude files if FUNC(common_path) returns True
     include=FUNC         don't exclude files if FUNC(common_path) returns True
+    file_matcher=FUNC    don't skip files if not file_matcher(src, dst, src_stats, dst_stats)
     buffer_size          used for copying file. Could be either an int or None.
 
     verbose              verbosity level
@@ -73,7 +84,7 @@ fs_sync(src, dst, **opt)
                                  you can retry the process by calling func(arg)
                                  or you can propagate the active exception by using raise
 
-    os_module                    the module to use to act on src (defaults to os module)
+    os_module                    the module to use to act on src and dst (defaults to os module)
 
 fs_sync.merge(src, dst, **kw)
   equiv fs_sync with archive=True
@@ -110,6 +121,8 @@ fs_sync.remove(dst, **kw)
     omit_link_times = True
     if chown is not None:
       chown_uid, chown_gid = chown
+    if src_time_offset is None:
+      src_time_offset = 0
     if exclude is None:
       exclude = lambda _: False
     if include is None:
@@ -122,7 +135,11 @@ fs_sync.remove(dst, **kw)
       ignore_backup_delete_errors = True
     if os_module is None: os_module = os
 
-    user_check = True if size_only or update or content else False
+    if not isinstance(src, (str, bytes)): src = os_module.fspath(src)
+    if not isinstance(dst, (str, bytes)): dst = os_module.fspath(dst)
+    if backup_dir and not isinstance(backup_dir, (str, bytes)): backup_dir = os_module.fspath(backup_dir)
+
+    user_check = True if size_only or times_only or update or content or file_matcher else False
 
     def mkerr(E,*a,**k):
       e = E(*a)
@@ -176,7 +193,9 @@ fs_sync.remove(dst, **kw)
     def _sync(*a):    return None if dry_run else fs_sync(*a, archive=True, buffer_size=buffer_size, os_module=os_module)
     def rm(a,s):      return rmdir(a) if stat.S_ISDIR(s.st_mode) else unlink(a)
     @verbose3("move")
-    def mv(*a):       return None if dry_run else fs_move(*a, buffer_size=buffer_size, src_os_module=os_module, dst_os_module=os_module)
+    # using fs_move is not enough as we need to move or merge
+    def mv(*a):       return None if dry_run else fs_sync(*a, archive=True, remove_source_files=True, remove_source_dirs=True, buffer_size=buffer_size, os_module=os_module)
+    #def mv(*a):       return None if dry_run else fs_move(*a, buffer_size=buffer_size, src_os_module=os_module, dst_os_module=os_module)
     @verbose3("copy")
     def copyfile(*a): return None if dry_run else fs_copyfile(*a, buffer_size=buffer_size, src_os_module=os_module, dst_os_module=os_module)
     #def isdir(a):
@@ -213,8 +232,8 @@ fs_sync.remove(dst, **kw)
         if omit_dir_times and stat.S_ISDIR(src_stats.st_mode): pass
         else:
           diff = supmodifywindow if update else diffmodifywindow
-          if (not dst_stats or diff(src_stats.st_mtime, dst_stats.st_mtime)):
-            utime(dst, (src_stats.st_atime, src_stats.st_mtime))
+          if (not dst_stats or diff(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime)):
+            utime(dst, (src_stats.st_atime + src_time_offset, src_stats.st_mtime + src_time_offset))
 
     def dobackup(dst, backup_dir, bakname, copy=False):
       # XXX what if backing up (rename) an hardlinked file ?
@@ -245,19 +264,23 @@ fs_sync.remove(dst, **kw)
     def diffdir(src_stats, dst_stats):
       if times and not omit_dir_times:
         if update:
-          if supmodifywindow(src_stats.st_mtime, dst_stats.st_mtime): return 1
+          if supmodifywindow(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime): return 1
           return 0
-        if diffmodifywindow(src_stats.st_mtime, dst_stats.st_mtime): return 1
+        if diffmodifywindow(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime): return 1
         return 0
       return 0
 
     def difffilecontent(src, dst, src_stats, dst_stats):
       # user checks
       if user_check:
+        if file_matcher:
+          if not file_matcher(src, dst, src_stats, dst_stats): return 1
         if update:
-          if supmodifywindow(src_stats.st_mtime, dst_stats.st_mtime): return 1
+          if supmodifywindow(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime): return 1
         if size_only:
           if src_stats.st_size != dst_stats.st_size: return 1
+        if times_only:
+          if diffmodifywindow(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime): return 1
         if content:
           equals = same(src, dst, compare_size=False, max_length=None if head is None or head < 0 else head, stats=(src_stats, dst_stats))
           if not equals: return 1
@@ -265,7 +288,7 @@ fs_sync.remove(dst, **kw)
 
       # rsync "quick check" is check mod-time & size
       if src_stats.st_size != dst_stats.st_size: return 1
-      if diffmodifywindow(src_stats.st_mtime, dst_stats.st_mtime): return 1
+      if diffmodifywindow(src_stats.st_mtime + src_time_offset, dst_stats.st_mtime): return 1
 
       # additional checks
       if head is not None:
@@ -395,7 +418,9 @@ fs_sync.remove(dst, **kw)
                   dobackup(dst, backup_dir, bakname)
                   dst_stats = None
                 moved = True if remove_source_files and softreplace(src, dst) else False
-                if not moved: copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
+                if not moved:
+                  copyfile(src, dst)  # XXX this is inplace, it should not be inplace by default !
+                  dst_stats = None  # copyfile changes mtime (and possibly some other stat), force to copystat
               if not moved: copystat(dst, src_stats, dst_stats)
               if not diff:
                 if verbose > 1: onverbose("uptodate", dstname)
@@ -504,4 +529,4 @@ fs_sync.remove(dst, **kw)
   return fs_sync
 
 fs_sync = fs_sync()
-fs_sync._required_globals = ["os", "stat", "sys", "errno", "fs_copyfile", "fs_move", "fs_diff", "os_path_splitall", "uniq"]
+fs_sync._required_globals = ["errno", "os", "stat", "sys", "fs_copyfile", "fs_diff", "os_path_splitall", "uniq"]

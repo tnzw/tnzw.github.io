@@ -1,4 +1,4 @@
-# pysetupdi.py Version 20201022-1
+# pysetupdi.py Version 20201022-2
 # https://github.com/gwangyi/pysetupdi
 
 # MIT License
@@ -46,6 +46,7 @@ C:\> pysetupdi -i "SCSI\DISK&VEN_SAMSUN_&PROD_MZNTE256HMHP-000\4&103D1686&0&0000
 '''
   class pysetupdi(object): pass
   pysetupdi = pysetupdi()
+  if sys.platform != "win32": return pysetupdi
 
   ### structures.py
 
@@ -1363,4 +1364,5 @@ pysetupdi._required_globals = [
   "enum",
   "typing",
   "struct",
+  "sys",
 ]

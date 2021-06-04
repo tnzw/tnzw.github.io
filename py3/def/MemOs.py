@@ -1,12 +1,12 @@
-# MemOs.py Version 1.4.1
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# MemOs.py Version 1.5.3
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
-class MemOs(object):  # XXX TEST THE WHOLE CLASS !
+class MemOs(object):
   """\
 An os module like object that only act in memory in a virtual file system
 """
@@ -26,8 +26,8 @@ An os module like object that only act in memory in a virtual file system
   name = None
   path = None
 
-  uid = 0
-  gid = 0
+  _uid = 0
+  _gid = 0
 
   def __init__(self, *, name=None, path=None):
     if name is None: name = "_mem_os"
@@ -36,17 +36,18 @@ An os module like object that only act in memory in a virtual file system
     self.path = posixpath if path is None else path
     self._fs = {self._ROOT_INO: {b".": self._ROOT_INO, b"..": self._ROOT_INO}}
     now = time.time()
-    self._meta = {self._ROOT_INO: {"st_mode": self.T_DIR | 0o755, "st_ino": self._ROOT_INO, "st_nlink": 1, "st_uid": int(self.uid), "st_gid": int(self.gid), "st_size": 4096, "st_atime": now, "st_mtime": now}}
+    self._meta = {self._ROOT_INO: {"st_mode": self.T_DIR | 0o755, "st_ino": self._ROOT_INO, "st_nlink": 1, "st_uid": int(self._uid), "st_gid": int(self._gid), "st_size": 4096, "st_atime": now, "st_mtime": now}}
     self._last_ino = self._ROOT_INO
     self._proc_cwd = (b"/",)
     self._proc_cwd_ino = (self._ROOT_INO,)
     self._proc_fd = {}
 
   def __del__(self):
-    for fd in self._proc_fd:
-      self.close(fd)
+    for fds in self._proc_fd.values():
+      fds["closed"] = True  # copied from `close()`
 
-  # File Names, Command Line Arguments, and Environment Variables
+
+  # Process Parameters
 
   def fsencode(self, filename):
     filename = self.fspath(filename)
@@ -62,24 +63,28 @@ An os module like object that only act in memory in a virtual file system
 
   def fspath(self, path): return os_fspath(path)
 
+  def getgid(self): return self._gid
+  def getuid(self): return self._uid
+
+  def setgid(self, gid):
+    if not isinstance(gid, int): raise TypeError("gid should be integer")
+    if gid < 0: return
+    self._gid = gid
+
+  def setuid(self, uid):
+    if not isinstance(uid, int): raise TypeError("uid should be integer")
+    if uid < 0: return
+    self._uid = uid
+
+  def strerror(self, code): return os_strerror(code)
+
   def umask(self, mask):
     p, self._umask = self._umask, 0o777 & mask
     return p
 
-  # File Object Creation  
+  # File Object Creation
 
-  def fdopen(self, fd, mode="r", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
-    # XXX compare os.fdopen behavior ! with opener or not
-    if buffering not in (None, -1): raise NotImplementedError()
-    if encoding is not None: raise NotImplementedError()
-    if opener is not None:
-      return FileIO(None, mode, closefd=closefd, opener=opener, os_module=self)
-    else:
-      fds = self._getcheck_fd(fd, fmt="reg")
-      mode_flags = convert_open_mode_to_flags(mode, os_module=self)
-      if fds["flags"] not in (mode_flags, mode_flags | self.O_NOINHERIT): raise XXX
-      #if opener is not None: raise NotImplementedError()  # XXX
-      return FileIO(fds["path"], mode, closefd=closefd, opener=lambda *a: fd, os_module=self)
+  def fdopen(self, *a, **k): return open2(*a, os_module=self, **k)
 
   # File Descriptor Operations
 
@@ -98,14 +103,16 @@ An os module like object that only act in memory in a virtual file system
     fds["closed"] = True
     del self._proc_fd[fd]
 
-  #def copy_file_range(self, src, dst, count, offset_src=None, offset_dst=None): XXX
+  def copy_file_range(self, src, dst, count, offset_src=None, offset_dst=None):
+    # XXX protect from no O_BINARY or no linesep "\n" ?
+    return os_copy_file_range(src, dst, count, offset_src=offset_src, offset_dst=offset_dst, os_module=self)
 
   def dup(self, fd):
     fds = self._getcheck_fd(fd)
     newfd = self._next_fd()
     self._proc_fd[newfd] = fds.copy()
     return newfd
-    
+
   #def dup2 XXX ?
 
   def fchmod(self, fd, mode): return self._hchmod(self._getcheck_fd(fd)["meta"], mode)
@@ -136,6 +143,7 @@ An os module like object that only act in memory in a virtual file system
     elif how == self.SEEK_END: pos += len(fds["data"])
     else: raise OSError(errno.EINVAL, "Invalid argument")
     if pos < 0: raise OSError(errno.EINVAL, "Invalid argument")
+    fds["seek"] = pos
     return pos
 
   SEEK_SET = 0
@@ -146,12 +154,12 @@ An os module like object that only act in memory in a virtual file system
     p_ino, p = self._traverse(path, dir_fd=dir_fd, not_found_as_none=True)
     w,rw,a,c,t,x = (flags & getattr(self, "O_" + _) for _ in "WRONLY RDWR APPEND CREAT TRUNC EXCL".split())
     r = 0 if w or rw else 1
-    if x and p_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File exists", path)
     now = time.time()
     if c:
+      if x and p_ino[-1] is not None: raise FileExistsError(errno.EEXIST, "File exists", path)
       dir = self._fs[p_ino[-2]]
       ino = self._next_ino()
-      data, meta = bytearray(), {"st_mode": self.T_REG | (mode & (0o777 - self._umask)), "st_nlink": 1, "st_uid": int(self.uid), "st_gid": int(self.gid), "st_ino": ino, "st_size": 0, "st_atime": now, "st_mtime": now}
+      data, meta = bytearray(), {"st_mode": self.T_REG | (mode & (0o777 - self._umask)), "st_nlink": 1, "st_uid": int(self._uid), "st_gid": int(self._gid), "st_ino": ino, "st_size": 0, "st_atime": now, "st_mtime": now}
       if p_ino[-1] is not None:
         if not stat.S_ISREG(meta["st_mode"]): raise OSError(errno.EINVAL, "Invalid argument")  # XXX I just guessed the error...
         self._hunlink(dir, p[-1], p_ino[-1], self._meta[p_ino[-1]])
@@ -174,18 +182,18 @@ An os module like object that only act in memory in a virtual file system
     # XXX does O_WRONLY or O_RDWR updates mtime on opening ?
     return fd
 
-  O_RDONLY    = 0
-  O_WRONLY    = 1
-  O_RDWR      = 2
-  O_APPEND    = 8
-  O_CREAT     = 256
-  O_EXCL      = 1024
-  O_TRUNC     = 512
+  # linux and windows commons
+  O_RDONLY    = 0x00000000 # 0
+  O_WRONLY    = 0x00000001 # 1
+  O_RDWR      = 0x00000002 # 2
+  O_TRUNC     = 0x00000200 # 512
 
-  O_BINARY    = 32768
-  O_NOINHERIT = 128
-
-  O_NOATIME   = 262144  # XXX
+  # linux and windows differs
+  O_APPEND    = 0x01000000
+  O_CREAT     = 0x02000000
+  O_EXCL      = 0x04000000
+  O_BINARY    = 0x08000000
+  O_NOATIME   = 0x10000000
 
   #def pread(self, fd, n, offset): XXX
   #def preadv(self, fd, buffers, offset, flags=0): XXX
@@ -289,7 +297,7 @@ An os module like object that only act in memory in a virtual file system
     newdirino = self._next_ino()
     newdir = {b".": newdirino, b"..": p_ino[-2]}
     now = time.time()
-    newmeta = {"st_mode": self.T_DIR | (mode & (0o777 - self._umask)), "st_uid": int(self.uid), "st_nlink": 1, "st_gid": int(self.gid), "st_ino": newdirino, "st_size": 4096, "st_atime": now, "st_mtime": now}
+    newmeta = {"st_mode": self.T_DIR | (mode & (0o777 - self._umask)), "st_uid": int(self._uid), "st_nlink": 1, "st_gid": int(self._gid), "st_ino": newdirino, "st_size": 4096, "st_atime": now, "st_mtime": now}
     dir[p[-1]], self._fs[newdirino], self._meta[newdirino] = newdirino, newdir, newmeta
 
   def makedirs(self, name, mode=0o777, exist_ok=False): return os_makedirs(name, mode=mode, exist_ok=exist_ok, os_module=self)
@@ -374,7 +382,7 @@ An os module like object that only act in memory in a virtual file system
     n = self.fsencode(src)
     n_ino = self._next_ino()
     now = time.time()
-    n_meta = {"st_mode": self.T_LNK | (0o777 - self._umask), "st_uid": int(self.uid), "st_gid": int(self.gid), "st_ino": n_ino, "st_nlink": 1, "st_size": len(n), "st_atime": now, "st_mtime": now}
+    n_meta = {"st_mode": self.T_LNK | (0o777 - self._umask), "st_uid": int(self._uid), "st_gid": int(self._gid), "st_ino": n_ino, "st_nlink": 1, "st_size": len(n), "st_atime": now, "st_mtime": now}
     dir[d[-1]], self._fs[n_ino], self._meta[n_ino] = n_ino, n, n_meta
 
   def sync(self):
@@ -542,7 +550,7 @@ An os module like object that only act in memory in a virtual file system
     ldata = len(data)
     now = time.time()
     if ldata < length: data[ldata:], meta["st_size"], meta["st_atime"], meta["st_mtime"] = b"\x00" * (length - ldata), length, now, now
-    else             : data[     :], meta["st_size"], meta["st_atime"], meta["st_mtime"] =              data[:length], length, now, now    
+    else             : data[     :], meta["st_size"], meta["st_atime"], meta["st_mtime"] =              data[:length], length, now, now
 
   def _hunlink(self, dir, name, ino, meta):
     if meta["st_nlink"] > 1:
@@ -554,4 +562,15 @@ An os module like object that only act in memory in a virtual file system
       del self._fs[ino]
       del self._meta[ino]
 
-MemOs._required_globals = ["posixpath", "errno", "time", "stat", "convert_open_mode_to_flags", "os_fspath", "os_fwalk", "os_makedirs", "os_removedirs", "os_walk", "os_path_split", "FileIO"]
+MemOs._required_globals = [
+  "posixpath", "errno", "time", "stat",
+  "open2",
+  "os_copy_file_range",
+  "os_fspath",
+  "os_fwalk",
+  "os_makedirs",
+  "os_path_split",
+  "os_removedirs",
+  "os_strerror",
+  "os_walk",
+]
