@@ -5,7 +5,7 @@
     <meta name=viewport content="width=device-width,user-scalable=yes,initial-scale=1">
     <title>Tricount</title>
     <script>
-const BANNER=`tricount.html Version 0.1.0
+const BANNER=`tricount.html Version 0.2.0
 Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -116,9 +116,10 @@ function money(i, curr) {
 }
     </script>
     <script>
-
 function dce(tag,...args){var e=document.createElement(tag);for(let arg of args){if(Array.isArray(arg))for(let a of arg)e.appendChild(typeof a==="string"?document.createTextNode(a):a);else if(typeof arg==="string")e.innerHTML=arg;else if(arg&&typeof arg==="object"){for(let k of Object.keys(arg))if(k.slice(0,2)==="on"&&typeof arg[k]!=="string")e.addEventListener(k.slice(2),arg[k],typeof arg[k]==="object"?arg[k]:0);else e.setAttribute(k,arg[k]);}else if(typeof arg==="function")arg.call(e,e)}return e}
 function update(updates) { [].map.call(document.querySelectorAll("[onupdate]"),function(el){new Function("event", el.getAttribute("onupdate")).call(el, {type:"update",updates:updates})}) }
+function callOnAttr(el,type,event,safe,returnPrevents){if(safe)try{return callOnAttr(el,type)}catch(_){}var v=new Function("event", el.getAttribute('on'+type)).call(el, event);if(returnPrevents&&v===false)event.preventDefault();return v}
+
 function copyTextToClipboard(text) {
   function fallback() {
     var textArea = document.createElement("textarea");
@@ -177,21 +178,49 @@ function text(element) {
 
 function strip(text) { return text.replace(/(^\s+|\s+$)/g, "") }
 
+function setHash(hash, dispatch) {
+  var prevHash = location.hash || '#';
+  hash = '#' + encodeURI(hash);
+  if (prevHash === hash) return false;
+  if (history.state === null) history.pushState({},'',hash);
+  else history.replaceState({},'',hash);
+  if (dispatch) window.dispatchEvent(new Event("hashchange"));
+  return true;
+}
+function unsetHash() {
+  if (!location.hash) return;
+  if (history.state) history.back();  // cannot do a while (history.state) as history.back() is asynchronous, would need to wait for popstate event.
+  else history.pushState(null,'',location.href.replace(/#.*/, ""));
+}
+
+function genEntries() {
+  var a = JSON.parse(decodeURIComponent(location.hash.slice(1)) || '[]'), els = [];
+  if (!a.length) a = ["",""];
+  while (a.length)
+    els.push(dce("div",{style:"margin:0.5em 0em 0.5em 0"},[
+      dce("input",{oninput:"update({action:'refresh'})",placeholder:"name"},el=>{if(a)el.value=a.shift()}),
+      " spent ",dce("input",{type:"number",placeholder:"0,00",oninput:"update({action:'refresh'})",onchange:"if(isNaN(this.valueAsNumber))this.value='';update({})",onblur:"if(isNaN(this.valueAsNumber))this.value=''"},el=>{if(a)el.value=a.shift()})," € ",
+      dce("button",["-"],{onclick:"if(this.parentNode.parentNode.children.length>1){this.parentNode.remove();update({action:'refresh'})}"})," ",
+      dce("button",["+"],{onclick:"this.parentNode.insertAdjacentHTML('afterend', this.parentNode.outerHTML);update({action:'refresh'})"})
+    ]));
+  return els;
+}
+
+window.addEventListener("hashchange", function (ev) {
+  [].forEach.call(document.querySelectorAll('[onlocationhashchange]'), function (el) { callOnAttr(el,"locationhashchange",ev,1) });
+}, {passive: true});
+
 window.addEventListener("load", function () {
 
   document.body.appendChild(dce("div", [
-    dce("div", [
-      dce("div", [
-        dce("input", {oninput: "update({action:'refresh'})", placeholder: "name"}), " spent ", dce("input", {type: "number", placeholder: "0,00", oninput: "update({action:'refresh'})", onchange: "if(isNaN(this.valueAsNumber))this.value='';update({})"}), " € ", dce("button", ["-"], {onclick:"if(this.parentNode.parentNode.children.length>1){this.parentNode.remove();update({action:'refresh'})}"}), dce("button", ["+"], {onclick:"this.parentNode.insertAdjacentHTML('afterend', this.parentNode.outerHTML);update({action:'refresh'})"})
-      ])
-    ]),
-    dce("p", {onupdate: "let a=[];for(let [i,c] of enumerate(this.previousSibling.children)){let _=c.querySelectorAll('input');a.push([_[0].value||(i+1),(_[1].valueAsNumber*100)|0])}let t=tricount(a.map(v=>v[1]));this.textContent=Object.keys(t).map(k=>{let [j,i,c]=t[k];return `${a[j][0]||(j+1)} gives ${money(c)} to ${a[i][0]||(i+1)}`}).join(', ') || 'Nothing to do'"}),
-    dce("button", ["Share report"], {onclick: "eventShare.call(this, event, strip(text(this.parentNode)), 'Error…')"}), " ",
-    dce("button", ["Copy report"], {onupdate: "this.textContent='Copy report'", onclick: "eventCopyText.call(this, event, strip(text(this.parentNode)), 'Copied!', 'Error…')"})
+    dce("div",{onlocationhashchange:"let ee=genEntries();this.innerHTML='';ee.forEach(el=>this.appendChild(el))"},genEntries()),
+    dce("p",{onupdate:"let a=[];for(let [i,c] of enumerate(this.previousSibling.children)){let _=c.querySelectorAll('input');a.push([_[0].value||(i+1),(_[1].valueAsNumber*100)|0])}let t=tricount(a.map(v=>v[1]));this.textContent=Object.keys(t).map(k=>{let [j,i,c]=t[k];return `${a[j][0]||(j+1)} gives ${money(c)} to ${a[i][0]||(i+1)}`}).join(', ')||'Nothing to do'"}),
+    dce("button",["Share report"],{onclick:"eventShare.call(this, event, {title:strip(text(this.parentNode))+'\\n',url:location.href},'Error…')"})," ",
+    dce("button",["Copy report"],{onupdate:"this.textContent='Copy report'", onclick: "eventCopyText.call(this,event,strip(text(this.parentNode)),'Report copied!','Error…')"})," ",
+    dce("button",["Copy url"],{onupdate:"this.textContent='Copy url';let a=[].map.call(this.parentNode.querySelectorAll('input'),e=>e.value);if(a.some(v=>v)){setHash(JSON.stringify(a))}else{unsetHash()}",onclick:"eventCopyText.call(this,event,location.href,'Url copied!','Error…')"})
   ]));
 
 });
-
     </script>
     <style>
 body.css-filter-invert{background-color:#000}
