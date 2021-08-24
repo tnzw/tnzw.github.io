@@ -196,8 +196,8 @@ def test_dd_bs4_cbs4_unblock_sync():
   dd("if", "of", bs=4, cbs=4, conv=dd.CONV_SYNC | dd.CONV_UNBLOCK)
   assert_equal(b"123\n   4\n5 6\n\n\n\n", fs_readfile("of"))
 @dd_tester
-def test_dd_write_on_device():
-  if 0:
+def test_dd_write_on_device(condition=0):
+  if condition:
     ifile = "C:\\Users\\tc\\Desktop\\EntreLeursMains\\Entre Leurs Mains.mkv"
     lifile = os.stat(ifile).st_size
     tfile = "C:\\Users\\tc\\Desktop\\EntreLeursMains\\Entre Leurs Mains_2.mkv"

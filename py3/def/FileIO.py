@@ -1,4 +1,4 @@
-# FileIO.py Version 2.1.0
+# FileIO.py Version 2.1.1
 # Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -25,6 +25,8 @@ class FileIO(object):
             "readinto", "write"):
     exec(f"def {_}(*a, **k): return RawIOBase.{_}(*a, **k)", globals(), locals())
   del _
+
+  def __repr__(self): return f'<{self.__class__.__qualname__} name={self.name!r} mode={self.mode!r} closefd={self._closefd!r}>'
 
   @property
   def closed(self): return self._closed

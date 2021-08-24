@@ -1,4 +1,4 @@
-# Base64Decoder.py Version 1.1.0
+# Base64Decoder.py Version 1.1.0-2
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -21,7 +21,6 @@ opt:
          => <CUSTOM_SCHEME> (`compute_scheme(codes, padding, ignored)`)
   cast => bytes: (default) cast the returned transcoded values to bytes.
        => None : do not cast, returns transcoded byte iterator instead.
-  computed : internal use only.
   cache    : internal use only.
   state    : internal use only.
 

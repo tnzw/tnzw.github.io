@@ -1,0 +1,10 @@
+def test_io_readexactly():
+  r = io.BytesIO(b"abcdefg")
+  assert_equal(io_readexactly(r, 3), b"abc")
+  assert_equal(io_readexactly(r, 3), b"def")
+  err = assert_raise(io_IncompleteReadError, lambda: io_readexactly(r, 3))
+  assert_equal(err.partial, b"g")
+  assert_equal(err.expected, 3)
+  err = assert_raise(io_IncompleteReadError, lambda: io_readexactly(r, 1))
+  assert_equal(err.partial, b"")
+  assert_equal(err.expected, 1)

@@ -1,4 +1,4 @@
-# url_os.py Version 1.0.0
+# url_os.py Version 1.0.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -42,12 +42,18 @@ def url_os():
       if head and head != sep: head = head[:-1]
       return head, tail
     def splitext(self, p):
-      p = self.basename(p)
+      # splitext() might not work as expected.
+      # Here, it follows classic os.splitext() behavior (not browser behavior).
+      # Firefox uses content to detect file type.
+      # Windows explorer uses basename.endswith(".ext") to detect file type (eg ".pdf" is a PDF).
+      b = self.basename(p)
       if isinstance(p, bytes): sep, extsep = b"/", b"."
       else: sep, extsep = "/", "."
-      i = p[1:].rfind(extsep)
+      b = b.lstrip(extsep)
+      i = b.rfind(extsep)
       if i == -1: return p, p[:0]
-      return p[:i+1], p[i+1:]
+      ext = b[i:]
+      return p[:-len(ext)], b[i:]
     def splitdrive(self, p):
       p = self.os.fspath(p)
       return p[:0], p
@@ -74,7 +80,7 @@ def url_os():
       comps = (path[1:] if isabs else path).split(sep)
       new_comps = []
       for comp in comps:
-        if comp in (dot,): comp = empty
+        if comp == dot: comp = empty
         if (comp != dotdot or (not isabs and not new_comps) or
             (new_comps and new_comps[-1] == dotdot)):
           new_comps.append(comp)

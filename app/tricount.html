@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=UTF-8>
+    <meta name=viewport content="width=device-width,user-scalable=yes,initial-scale=1">
+    <title>Tricount</title>
+    <script>
+const BANNER=`tricount.html Version 0.1.0
+Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
+This program is free software. It comes without any warranty, to
+the extent permitted by applicable law. You can redistribute it
+and/or modify it under the terms of the Do What The Fuck You Want
+To Public License, Version 2, as published by Sam Hocevar. See
+http://www.wtfpl.net/ for more details.`,
+  TITLE=document.title||(/[^\s]+/).exec(BANNER)[1],
+  VERSION=(/Version (.*)/m).exec(BANNER)[1],
+  LICENSE=BANNER.replace(/^.*\n/,""),
+  fork_me_on="https://github.com/tnzw/tnzw.github.io/blob/master/app/tricount.html";
+
+function dict(iterable) {
+  var o = {}, k, v;
+  for ([k, v] of iterable) o[k] = v;
+  return o;
+}
+dict.keys = function* (o) {
+  for (let k of Object.keys(o)) yield k;
+};
+dict.values = function* (o) {
+  for (let k of Object.keys(o)) yield o[k];
+};
+dict.items = function* (o) {
+  for (let k of Object.keys(o)) yield [k, o[k]];
+};
+
+function* enumerate(iterable) {
+  var i = 0, _;
+  for (_ of iterable) yield [i++, _];
+}
+
+function* filter(fn, iterable) {
+  for (let _ of iterable) if (fn(_)) yield _;
+}
+function* map(fn, iterable) {
+  for (let _ of iterable) yield fn(_);
+}
+
+function sum(iterable) {
+  var i = 0, _;
+  for (_ of iterable) i += _;
+  return i;
+}
+
+function round(f) {
+  if (f < 0) {
+    if (f % 1 > -0.5) return f|0;
+    return (f|0) - 1;
+  }
+  if (f % 1 < 0.5) return f|0;
+  return (f|0) + 1
+}
+
+function* cycle(iterable) {
+  var l = [], _;
+  for (_ of iterable) { l.push(_); yield _ }
+  while (true) yield* l;
+}
+
+function divmod(a, b) {
+  var mod = a % b;
+  return [(a - mod) / b, mod];
+}
+
+function tricount(iterable) {
+  let paid = Array.from(iterable);
+  if (paid.length <= 1) return {};
+  let [moy, rem] = divmod(sum(paid), paid.length);
+  let due = paid.map(v => v - moy);
+  let pos = dict(filter(d => d[1] > 0, enumerate(due)));
+  let neg = dict(filter(d => d[1] < 0, enumerate(due)));
+  let sum_neg = sum(dict.values(neg));
+  let neg_rate = dict(map(([i, d]) => [i, d / sum_neg], dict.items(neg)));
+  let todo = {};
+  let i, p, j, n
+  for ([i, p] of dict.items(pos)) {
+    let pv = p;
+    for ([j, n] of dict.items(neg)) {
+      let r = neg_rate[j];
+      let c = (p * r)|0;
+      pv -= c;
+      pos[i] = pv;
+      neg[j] = n + c;
+      todo[JSON.stringify([j,i])] = [j|0,i|0,c];
+    }
+  }
+  let neg_cycle = cycle(Object.keys(neg));
+  for ([i, p] of dict.items(pos)) {
+    while (p > 0) {
+      j = neg_cycle.next().value;
+      p -= 1;
+      pos[i] = p;
+      neg[j] += 1;
+      let js = JSON.stringify([j,i]);
+      todo[js] = [j|0,i|0,todo[js][2] + 1];
+    }
+  }
+  if (rem !== sum(dict.values(neg))) throw new Error("AssertionError");  // ensure 100% precise
+  return todo
+}
+
+function money(i, curr) {
+  let s = "";
+  if (curr === undefined) curr = "€";
+  if (i < 0) { s = "-"; i = -i }
+  let [d, m] = divmod(i, 100);
+  return `${s}${d},${m >= 10 ? m : "0" + m}${curr}`;
+}
+    </script>
+    <script>
+
+function dce(tag,...args){var e=document.createElement(tag);for(let arg of args){if(Array.isArray(arg))for(let a of arg)e.appendChild(typeof a==="string"?document.createTextNode(a):a);else if(typeof arg==="string")e.innerHTML=arg;else if(arg&&typeof arg==="object"){for(let k of Object.keys(arg))if(k.slice(0,2)==="on"&&typeof arg[k]!=="string")e.addEventListener(k.slice(2),arg[k],typeof arg[k]==="object"?arg[k]:0);else e.setAttribute(k,arg[k]);}else if(typeof arg==="function")arg.call(e,e)}return e}
+function update(updates) { [].map.call(document.querySelectorAll("[onupdate]"),function(el){new Function("event", el.getAttribute("onupdate")).call(el, {type:"update",updates:updates})}) }
+function copyTextToClipboard(text) {
+  function fallback() {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    try {
+      textArea.focus();
+      textArea.select();
+      var successful = document.execCommand("copy");
+      return Promise.resolve(successful ? undefined : "unable to copy");
+    } catch (err) {
+      return Promise.resolve(err);
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }
+  if (!navigator.clipboard) return fallback();
+  return navigator.clipboard.writeText(text).then(null, function (err) { return err; });
+}
+function eventCopyText(event, text, successMessage, unabletocopy) {
+  if (event.ctrlKey || event.shiftKey) return;
+  var el = this;
+  function onerror(err) {
+    if (err === "unable to copy") el.textContent = unabletocopy;
+    if (err) el.textContent = err;
+    else el.textContent = successMessage;
+    el.focus();
+  }
+  event.preventDefault();
+  try { copyTextToClipboard(text).then(onerror) } catch (_) { onerror(_) }
+}
+function eventShare(event, data, unabletoshare) {
+  if (event.ctrlKey || event.shiftKey) return;
+  var el = this;
+  function onerror(err) {
+    if (err.name === "AbortError") return;
+    try { console.error(err) } catch (_) {}
+    el.textContent = unabletoshare || err.message;
+  }
+  event.preventDefault();
+  try { navigator.share(data).then(null, onerror) } catch (_) { onerror(_) }
+}
+
+function text(element) {
+  if (element.nodeType === 3) return element.textContent;
+  if (element.tagName === "BUTTON") return "";
+  if (element.tagName === "INPUT") return element.value || element.placeholder || "";
+  let t = "";
+  for (let n of element.childNodes) t += text(n);
+  if (({DIV:1,P:1})[element.tagName]) t += "\n";
+  return t;
+}
+
+function strip(text) { return text.replace(/(^\s+|\s+$)/g, "") }
+
+window.addEventListener("load", function () {
+
+  document.body.appendChild(dce("div", [
+    dce("div", [
+      dce("div", [
+        dce("input", {oninput: "update({action:'refresh'})", placeholder: "name"}), " spent ", dce("input", {type: "number", placeholder: "0,00", oninput: "update({action:'refresh'})", onchange: "if(isNaN(this.valueAsNumber))this.value='';update({})"}), " € ", dce("button", ["-"], {onclick:"if(this.parentNode.parentNode.children.length>1){this.parentNode.remove();update({action:'refresh'})}"}), dce("button", ["+"], {onclick:"this.parentNode.insertAdjacentHTML('afterend', this.parentNode.outerHTML);update({action:'refresh'})"})
+      ])
+    ]),
+    dce("p", {onupdate: "let a=[];for(let [i,c] of enumerate(this.previousSibling.children)){let _=c.querySelectorAll('input');a.push([_[0].value||(i+1),(_[1].valueAsNumber*100)|0])}let t=tricount(a.map(v=>v[1]));this.textContent=Object.keys(t).map(k=>{let [j,i,c]=t[k];return `${a[j][0]||(j+1)} gives ${money(c)} to ${a[i][0]||(i+1)}`}).join(', ') || 'Nothing to do'"}),
+    dce("button", ["Share report"], {onclick: "eventShare.call(this, event, strip(text(this.parentNode)), 'Error…')"}), " ",
+    dce("button", ["Copy report"], {onupdate: "this.textContent='Copy report'", onclick: "eventCopyText.call(this, event, strip(text(this.parentNode)), 'Copied!', 'Error…')"})
+  ]));
+
+});
+
+    </script>
+    <style>
+body.css-filter-invert{background-color:#000}
+.css-filter-invert{filter:invert(100%)}
+    </style>
+  </head>
+  <body onload="window.matchMedia('(prefers-color-scheme:dark)').matches&&document.body.classList.add('css-filter-invert')">
+    <h1>Tricount</h1>
+    <noscript>Please enable javascript to run this app</noscript>
+  </body>
+</html>

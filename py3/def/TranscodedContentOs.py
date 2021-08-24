@@ -1,4 +1,4 @@
-# TranscodedContentOs.py Version 1.0.2
+# TranscodedContentOs.py Version 1.0.3
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -42,7 +42,7 @@ class TranscodedContentOs(object):
 
   def lseek(self, fd, pos, how):
     if pos != 0 or how != self.os.SEEK_END:
-      raise OSError(errno.EINVAL, f"{self.__class__.__name__}: unhandled lseek")
+      raise OSError(errno.EINVAL, f"{self.__class__.__name__}: unhandled lseek (fd, pos={pos!r}, how={how!r})")
     return self.os.lseek(fd, pos, how)
 
   def read(self, fd, n):

@@ -1,5 +1,5 @@
-# io_copy.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# io_copy.py Version 1.0.0-2
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -10,6 +10,8 @@ def io_copy():
   def io_copy(*a, **k):
     """\
 io_copy(fsrc, fdst, **opt) -> read, written
+
+opt:
   length => None or < 0 : read/write as most data as possible
                       0 : read/write no data
                     > 0 : maximum read/write amount of data
@@ -42,3 +44,4 @@ io_copy(fsrc, fdst, **opt) -> read, written
   io_copy.iter = iter
   return io_copy
 io_copy = io_copy()
+io_copy._required_globals = ["io_iterread1"]

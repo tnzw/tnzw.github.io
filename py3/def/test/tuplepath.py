@@ -145,7 +145,7 @@ def test_tuplepath__ntpath_extend():
     tpath = tuplepath(path, os_module=ntos)
     assert_equal(tpath.extend(extend).tuple, expected, info=(path, extend))
 
-def test_tuplepath__ntpath_extend():
+def test_tuplepath__posixpath_extend():
   def posixos(): pass
   posixos.path = posixpath
   posixos.fspath = os.fspath
@@ -211,5 +211,36 @@ def test_tuplepath__extend_types():
   assert_equal(tuplepath(b"one").extend("two").pathname, b"one"+sepb+b"two")
 
 def test_tuplepath__mixed_type():
-  assert_equal(tuplepath(("/", b"element")).pathname, "/element")
-  assert_equal(tuplepath((b"/", "element")).pathname, b"/element")
+  assert_equal(tuplepath(root="/", names=(b"element",)).pathname, "/element")
+  assert_equal(tuplepath(root=b"/", names=("element",)).pathname, b"/element")
+
+def test_tuplepath__extname():
+  assert_equal(tuplepath("lol.ext").extname, ".ext")
+  assert_equal(tuplepath("lol/a..ext").extname, ".ext")
+  assert_equal(tuplepath(".ext").extname, "")
+  assert_equal(tuplepath("lol/.ext").extname, "")
+  assert_equal(tuplepath("lol/..ext").extname, "")
+
+def test_tuplepath__replace_ext():
+  sep = os.sep
+  assert_equal(tuplepath("lol.ext").replace(ext=".hey").pathname, "lol.hey")
+  assert_equal(tuplepath("lol/a..ext").replace(ext=".hey").pathname, f"lol{sep}a..hey")
+  assert_equal(tuplepath(".ext").replace(ext=".hey").pathname, ".ext.hey")
+  assert_equal(tuplepath("lol/.ext").replace(ext=".hey"), f"lol{sep}.ext.hey")
+  assert_equal(tuplepath("lol/..ext").replace(ext=".hey").pathname, f"lol{sep}..ext.hey")
+
+# XXX do the same for replaceos, replaceroot, replacenames, replacebase, replacedrive, replacepath, replacedir
+
+def test_tuplepath__join():
+  def ntos(): pass
+  ntos.path = ntpath
+  ntos.fspath = os.fspath
+  ntos.fsencode = os.fsencode
+  ntos.fsdecode = os.fsdecode
+  def tp(*a, **k): return tuplepath(*a, os_module=ntos, **k)
+  def fromrootnames(*a): return tuplepath.fromrootnames(*a, os_module=ntos)
+  tp.fromrootnames = fromrootnames
+
+  assert_equal(tp.fromrootnames("").join(tp.fromrootnames("")).pathname, ntpath.join("", ""))
+  assert_equal(tp.fromrootnames("", "a", "", "", "b", "", "", "").join(tp.fromrootnames("", "c", "", "", "d")).pathname, ntpath.join("a\\\\\\b\\\\\\", "c\\\\\\d"))
+  assert_equal(tp.fromrootnames("", "a", "", "", "b", "", "", "").join(tp.fromrootnames("\\", "c", "", "", "d")).pathname, ntpath.join("a\\\\\\b\\\\\\", "\\c\\\\\\d"))

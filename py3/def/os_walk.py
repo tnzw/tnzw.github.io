@@ -1,5 +1,5 @@
-# os_walk.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# os_walk.py Version 1.0.1
+# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -30,7 +30,8 @@ def os_walk(top, topdown=True, onerror=None, followlinks=False, *, dir_fd=None, 
           if stat.S_ISDIR(stats.st_mode): dirnames.append(name)
           else: nondirnames.append(name)
       else:
-        try: entries = scandir(path if top_fd is None else top_fd)
+        try:
+          with scandir(path if top_fd is None else top_fd) as scan: entries = list(scan)
         except OSError as e:
           if onerror is None: raise
           onerror(e)

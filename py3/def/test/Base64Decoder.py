@@ -38,9 +38,8 @@ def test_Base64Decoder__6_decode_stress():
   encoded = base64.b64encode(expected)
   decoded = b""
   std = Base64Decoder()
-  for enc in encoded:
-    for dec in std.decode(bytes((enc,)), stream=True):
-      decoded += bytes((dec,))
+  for enc in encoded: decoded += std.decode(bytes((enc,)), stream=True)
+  #decoded += std.decode()  # useless here ?
   assert_equal(decoded, expected)
 
 def test_Base64Decoder__7_url_scheme_decode_stress():
@@ -48,7 +47,6 @@ def test_Base64Decoder__7_url_scheme_decode_stress():
   encoded = base64.b64encode(expected).replace(b"+", b"-").replace(b"/", b"_")
   decoded = b""
   std = Base64Decoder(scheme="url")
-  for enc in encoded:
-    for dec in std.decode(bytes((enc,)), stream=True):
-      decoded += bytes((dec,))
+  for enc in encoded: decoded += std.decode(bytes((enc,)), stream=True)
+  #decoded += std.decode()  # useless here ?
   assert_equal(decoded, expected)

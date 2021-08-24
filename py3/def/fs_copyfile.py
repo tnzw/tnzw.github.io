@@ -1,4 +1,4 @@
-# fs_copyfile.py Version 2.0.2
+# fs_copyfile.py Version 2.0.3
 # Copyright (c) 2019-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -31,15 +31,15 @@ fs_copyfile(src, dst, flags, **opt) -> read, written
     return read, written
   def iter(src, dst, flags=0, *,
            preserve_timestamps=False, preserve_mode=False, preserve_ownership=False,
-           src_os_module=None, dst_os_module=None, buffer_size=None):
+           src_os_module=None, dst_os_module=None, os_module=None, buffer_size=None):
     """for read, written in fs_copyfile.iter(src, dst, flags, **opt): notify_progress(read, written)"""
     def checkbufsize(v):
       if isinstance(v, int) and v > 0: return v
       raise TypeError("invalid buffer size type")
     def noop(*a,**k): pass
 
-    if src_os_module is None: src_os_module = os
-    if dst_os_module is None: dst_os_module = os
+    if src_os_module is None: src_os_module = os if os_module is None else os_module
+    if dst_os_module is None: dst_os_module = os if os_module is None else os_module
     excl = dst_os_module.O_EXCL if flags & 1 else 0
     read, written = 0, 0
 

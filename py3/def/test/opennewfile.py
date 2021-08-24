@@ -31,6 +31,7 @@ def test_opennewfile():
   with opennewfile(b"b.lol") as f: assert_equal(f.name, b"b.lol")
   with opennewfile(b"b.lol") as f: assert_equal(f.name, b"b_1.lol")
   with opennewfile("b.lol") as f: assert_equal(f.name, "b_2.lol")
+  with opennewfile(os.getcwd() + os.sep + "b.lol") as f: assert_equal(f.name, os.getcwd() + os.sep + "b_3.lol")
 
   with opennewfile( "name.ext", base_format="{n} ({i}){e}") as f: assert_equal(f.name,  "name.ext")
   with opennewfile( "name.ext", base_format="{n} ({i}){e}") as f: assert_equal(f.name,  "name (1).ext")
@@ -43,7 +44,9 @@ def test_opennewfile():
 @opennewfile__tester
 def test_opennewfile__invalid_base_format():
   with opennewfile("name.ext", base_format="invalid format") as f: assert_equal(f.name, "name.ext")
+  with opennewfile("name.ext", base_format="invalid format") as f: assert_equal(f.name, "invalid format")
   assert_raise(ValueError, lambda: opennewfile("name.ext", base_format="invalid format"))
+  assert_raise(ValueError, lambda: opennewfile("name2.ext", base_format="name.ext", first_open=False))
   assert_raise(ValueError, lambda: opennewfile("name2.ext", base_format="invalid format", first_open=False))
 
 @opennewfile__tester
@@ -78,3 +81,8 @@ def test_opennewfile__custom_base_format():
 
   with opennewfile( "rand.ext", base_format=random_formatter(), first_open=False) as f: print("   'rand.ext'", repr(f.name)), assert_notequal(f.name,  "rand.ext")
   with opennewfile(b"rand.ext", base_format=random_formatter(), first_open=False) as f: print("  b'rand.ext'", repr(f.name)), assert_notequal(f.name, b"rand.ext")
+
+@opennewfile__tester
+def test_opennewfile__opentemp():
+  with opennewfile.temp("rand.ext") as f: print(f"  {f.name}")
+  with opennewfile.temp(b"rand.ext") as f: print(f"  {f.name}")

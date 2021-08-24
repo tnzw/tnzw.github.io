@@ -1,4 +1,4 @@
-# AltOs.py Version 1.1.5
+# AltOs.py Version 1.2.0
 # Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -9,15 +9,16 @@
 class AltOs(object):
   """\
 Same as os module but with:
-- fsdecode uses str.decode("UTF-8", "strict") on every platform
-- chdir / chroot does not check if directory exists
-- chdir / chroot are using a fake process chdir / chroot
-- chroot works on windows
-- chroot automatically changes cwd to b"/" if chroot is child of cwd
-- chown is equal to noop on windows (but can still use chown on mounted OSes)
+- fsdecode uses str.decode("UTF-8", "strict") on every platform by defaults
+- uses internal getcwd() mechanism
+- chdir() / chroot() / umask() only affects AltOs behavior
+- chdir() / chroot() does not check if directory exists
+- chroot() works on windows
+- chroot() automatically changes cwd to b"/" if chroot is child of cwd
+- chown() is equal to noop on windows (but can still use chown() on mounted OSes)
 - you can mount other "os" with alt_os.mount("/mnt", FtpOs("url", "usr", "pwd"))
     however, "/mnt" is still part of os, not FtpOs.
-- symlinks are followed to the same mount point (os following) instead of following in AltOs moint points
+- /!\\ symlinks are followed to the same mount point (os following) instead of following in AltOs moint points
 """
   # https://docs.python.org/3/library/os.html
 
@@ -26,20 +27,25 @@ Same as os module but with:
   _proc_root = None
   _proc_mounts = None
   _umask = 0o000
+  _fsencoding = "UTF-8"
+  _fsencodeerrors = "strict"
   _FD_START = 3
 
   error = OSError
   name = None
   path = None
 
-  def __init__(self, *, name=None, path=None, cwd=None, umask=0o000, root=None, os_module=None):
+  def __init__(self, *, name=None, path=None, cwd=None, umask=0o000, root=None, fsencoding=None, fsencodeerrors=None, path_module=None, os_module=None):
     self.os = os if os_module is None else os_module
+    self.linesep = self.os.linesep
     if name is None: name = self.os.name
     if not isinstance(name, str): raise TypeError("expected str for alt_os.name")
     self.name = name
-    self.path = self.os.path if path is None else path
+    if fsencoding: self._fsencoding = fsencoding
+    if fsencodeerrors: self._fsencodeerrors = fsencodeerrors
+    self.path = self.os.path if (path_module or path) is None else (path_module or path)  # path parameter is BBB
     self._proc_fd = {}
-    if cwd is None: cwd = self.os.getcwdb()
+    if cwd is None: cwd = tuplepath(self.os.getcwdb(), os_module=self.os).replace(os_module=self)
     if umask is None: umask = 0o000
     self._umask = umask & 0o777
     self._proc_cwd = self._tuplepath(cwd).fsencode().norm()
@@ -55,13 +61,13 @@ Same as os module but with:
   def fsencode(self, filename):
     filename = self.fspath(filename)
     if isinstance(filename, bytes): return filename
-    if isinstance(filename, str): return filename.encode("UTF-8")
+    if isinstance(filename, str): return filename.encode(self._fsencoding, self._fsencodeerrors)
     raise TypeError("expected str, bytes or os.PathLike, not " + type(filename))
 
   def fsdecode(self, filename):
     filename = self.fspath(filename)
     if isinstance(filename, str): return filename
-    if isinstance(filename, bytes): return filename.decode("UTF-8", "strict")
+    if isinstance(filename, bytes): return filename.decode(self._fsencoding, self._fsencodeerrors)
     raise TypeError("expected str, bytes or os.PathLike, not " + type(filename))
 
   def fspath(self, path): return os_fspath(path)
@@ -72,7 +78,7 @@ Same as os module but with:
 
   # File Object Creation
 
-  def fdopen(self, fd, *a, **k): return self._call_fd("fdopen", fd, *a, **k)
+  def fdopen(self, fd, *a, **k): return open2(fd, *a, os_module=self, **k)
 
   # File Descriptor Operations
 
@@ -80,7 +86,7 @@ Same as os module but with:
     self._call_fd("close", fd)
     #XXXfds = self._getcheck_fd(fd)
     #else: fds["os"].close(fds["fd"])
-    del self._proc_fd[fd]
+    if fd in self._proc_fd: del self._proc_fd[fd]
 
   #def copy_file_range(self, src, dst, count, offset_src=None, offset_dst=None): XXX
   #def dup(self, fd): XXX
@@ -105,25 +111,27 @@ Same as os module but with:
   def open(self, path, flags, mode=0o777, *, dir_fd=None):
     mode = mode & (0o777 - self._umask)  # XXX I think umask is applied, right ?
     subpath, os = self._traverse(path, dir_fd=dir_fd)
-    ofd = os.open(subpath, self._convert_open_flags(flags, os, 0), mode=mode)
+    ofd = os.open(subpath.replace(os_module=os).pathname, self._convert_open_flags(flags, os, 0), mode=mode)
     fds = {
       "fd": ofd, "os": os,
       "traversed": subpath,  # used by dir_fd functions
+      "realpath": self._realpath(subpath),  # used by scandir()
     }
     fd = self._next_fd()
     self._proc_fd[fd] = fds
     return fd
 
-  O_RDONLY    = 0
-  O_WRONLY    = 1
-  O_RDWR      = 2
-  O_APPEND    = 8
-  O_CREAT     = 256
-  O_EXCL      = 1024
-  O_TRUNC     = 512
+  O_RDONLY    = 0x000
+  O_WRONLY    = 0x001
+  O_RDWR      = 0x002
+  O_APPEND    = 0x008
+  O_CREAT     = 0x100
+  O_TRUNC     = 0x200
+  O_EXCL      = 0x400
 
-  O_BINARY    = 32768
-  O_NOINHERIT = 128
+  O_NOINHERIT = 0x80
+  O_BINARY    = 0x8000
+  O_CLOEXEC   = 0x80000
 
   #def pread(self, fd, n, offset): XXX
   #def preadv(self, fd, buffers, offset, flags=0): XXX
@@ -147,16 +155,16 @@ Same as os module but with:
   def chdir(self, path): self._proc_cwd = self._abspath(path)
 
   def chmod(self, path, mode, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("chmod", path, mode, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
-  def chown(self, path, uid, gid, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("chown", path, mode, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+  def chown(self, path, uid, gid, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("chown", path, uid, gid, dir_fd=dir_fd, follow_symlinks=follow_symlinks) if hasattr(self.os, "chown") else None
 
   def chroot(self, path):
     if not path: raise FileNotFoundError(errno.ENOENT, "No such file or directory", path)
     abspath = self._abspath(path)
     try: common = self._proc_cwd.commonpath((abspath,))
-    except ValueError: cwd = self._proc_cwd[:0].root(self._proc_cwd.rootname[len(self._proc_cwd.drivename):])
+    except ValueError: cwd = self._proc_cwd[:0].replace(root=self._proc_cwd.rootname[len(self._proc_cwd.drivename):])
     else:
-      if abspath == common: cwd = self._proc_cwd[len(common):].root(self._proc_cwd.sep).norm()
-      else: cwd = self._proc_cwd.root().root(self._proc_cwd.sep)
+      if abspath == common: cwd = self._proc_cwd[len(common):].replace(root=self._proc_cwd.sep).norm()
+      else: cwd = self._proc_cwd.replace(root=self._proc_cwd.sep, names=())
     newroot = self._realpath(abspath)
     self._proc_root, self._proc_cwd = newroot, cwd
 
@@ -174,19 +182,33 @@ Same as os module but with:
   def lchmod(self, path, mode): return self.chmod(path, mode, follow_symlinks=False)
   def lchown(self, path, uid, gid): return self.chown(path, uid, gid, follow_symlinks=False)
   def link(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None, follow_symlinks=True): return self._call_srcdst("link", src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd, follow_symlinks=follow_symlinks)
-  def listdir(self, path="."): return self._call_path("listdir", path)
+  def listdir(self, path="."): return self._call_pathorfd("listdir", path)
   def lstat(self, path, *, dir_fd=None): return self.stat(path, dir_fd=dir_fd, follow_symlinks=False)
   def mkdir(self, path, mode=0o777, *, dir_fd=None):
     mode = mode & (0o777 - self._umask)
     return self._call_path("mkdir", path, mode=mode, dir_fd=dir_fd)
   def makedirs(self, name, mode=0o777, exist_ok=False): return os_makedirs(name, mode=mode, exist_ok=exist_ok, os_module=self)
+  # XXX what about readlink ? should it return a translated path ?
   def readlink(self, path, *, dir_fd=None): return self._call_path("readlink", path, dir_fd=dir_fd)
   def remove(self, path, *, dir_fd=None): return self._call_path("remove", path, dir_fd=dir_fd)
   def removedirs(self, name): return os_removedirs(name, os_module=self)
   def rename(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None): return self._call_srcdst("rename", src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
   def replace(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None): return self._call_srcdst("replace", src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
   def rmdir(self, path, *, dir_fd=None): return self._call_path("rmdir", path, dir_fd=dir_fd)
-  def scandir(self, path="."): return self._call_path("scandir", path)
+  def scandir(self, path="."):
+    #return self._call_pathorfd("scandir", path)
+    fullpath = None
+    if isinstance(path, int):
+      if path in self._proc_fd:
+        realpath = self._proc_fd[path]["realpath"]
+        if realpath[:len(self._proc_root)] == self._proc_root: fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
+      scan = self._call_fd("scandir", path)
+      return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, dir_fd=path, os_module=self) for _ in scan))
+    realpath = self._realpath(path)
+    fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
+    scan = self._call_path("scandir", path)
+    return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, os_module=self) for _ in scan))
+    # XXX should DirEntry.path (or next DirEntry.path) vary while chrooting during a scan ?
   def stat(self, path, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("stat", path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
   def symlink(self, src, dst, target_is_directory=False, *, dir_fd=None): return self._call_srcdst("symlink", src, dst, target_is_directory=target_is_directory, dst_dir_fd=dir_fd)
   def sync(self):
@@ -257,9 +279,7 @@ Same as os module but with:
     while fd in self._proc_fd: fd += 1
     return fd
 
-  def _tuplepath(self, path):
-    if isinstance(path, tuplepath): return tuplepath(path.tuple, os_module=self)
-    return tuplepath(path, os_module=self)
+  def _tuplepath(self, path): return tuplepath(path, os_module=self)
 
   def _realpath(self, path, in_chroot=False):
     tpath = self._proc_cwd.join(path).fsencode().norm()
@@ -295,7 +315,7 @@ Same as os module but with:
     path = self.fspath(path)
     subpath, os = self._traverse(path, dir_fd=dir_fd)
     if isinstance(path, str): subpath = subpath.fsdecode()
-    return getattr(os, method)(subpath.pathname, *a[2:], **k)
+    return getattr(os, method)(subpath.replace(os_module=os).pathname, *a[2:], **k)
 
   def _call_pathorfd(self, *a, dir_fd=None, **k):
     method, pathorfd = a[:2]
@@ -310,7 +330,7 @@ Same as os module but with:
     if ossrc is not osdst: raise OSError(errno.EXDEV, "Invalid cross-device link", src, 17, dst)
     if isinstance(src, str): subsrc = subsrc.fsdecode()
     if isinstance(dst, str): subdst = subdst.fsdecode()
-    return getattr(ossrc, method)(subsrc.pathname, subdst.pathname, *a[3:], **k)
+    return getattr(ossrc, method)(subsrc.replace(os_module=ossrc).pathname, subdst.replace(os_module=osdst).pathname, *a[3:], **k)
 
   def _convert_lseek_how(self, how, os):
     how = (self.SEEK_SET, self.SEEK_CUR, self.SEEK_END).index(how)
@@ -319,8 +339,8 @@ Same as os module but with:
   def _convert_open_flags(self, flags, os, *soft):
     if os.O_RDONLY != 0: raise NotImplementedError("cannot handle O_RDONLY != 0")
     new_flags = 0
-    for attr in "WRONLY RDWR APPEND CREAT EXCL TRUNC BINARY NOINHERIT".split():
+    for attr in "WRONLY RDWR APPEND CREAT EXCL TRUNC BINARY NOINHERIT CLOEXEC".split():
       new_flags |= getattr(os, "O_" + attr, *soft) if flags & getattr(self, "O_" + attr) else 0
     return new_flags
 
-AltOs._required_globals = ["os", "errno", "tuplepath", "os_fspath", "os_fwalk", "os_makedirs", "os_path_split", "os_removedirs", "os_walk"]
+AltOs._required_globals = ["os", "errno", "DirEntry", "ScandirIterator", "open2", "os_fspath", "os_fwalk", "os_makedirs", "os_removedirs", "os_walk", "tuplepath"]

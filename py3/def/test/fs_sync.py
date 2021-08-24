@@ -237,6 +237,185 @@ def test_fs_sync__6_file_matcher():
   assert_equal(copied, [_.replace("/", os.sep) for _ in ('dst/a/b/c/f', 'dst/a/b/e', 'dst/a/d')])
   assert_equal([_[1] for _ in calls], [_.replace("/", os.sep) for _ in ("./././dst/a/b/c/f", "./././dst/a/b/e", "./././dst/a/d")])
 
+@fs_sync__tester
+def test_fs_sync__7_inplace_stress():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync.mirror("src", "dst", inplace=True)
+  os.utime("dst/a/b/c/f")
+  fs_sync.mirror("src", "dst", inplace=False)
+  def assert_verbose(_, path, *a): assert_equal(False, True, repr((_, path_, *a)))
+  fs_sync.mirror("src", "dst", inplace=False, verbose=1, onverbose=assert_verbose)
+
+@fs_sync__tester
+def test_fs_sync__8_copy_function():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync.mirror("src", "dst", copy_function=shutil.copyfileobj)
+  assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
+
+#@fs_sync__tester
+#def test_fs_sync__9_srcfile_dstfolder_dirs_force():
+#  lstat = fs_sync__soft_lstat
+#  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+#  with open("src/a", "wb") as f: pass
+#  a = lstat("src/a")
+#  assert_raise(OSError, lambda: fs_sync("src/a", "dst/a"))
+#  assert_notequal(lstat("src/a"), lstat("dst/a"))
+#  assert_raise(OSError, lambda: fs_sync("src/a", "dst/a", dirs=True))
+#  assert_notequal(lstat("src/a"), lstat("dst/a"))
+#  assert_raise(OSError, lambda: fs_sync("src/a", "dst/a", force=True))
+#  assert_notequal(lstat("src/a"), lstat("dst/a"))
+#  fs_sync("src/a", "dst/a", dirs=True, force=True)
+#  assert_equal(lstat("src/a"), lstat("dst/a"))
+#  assert_equal(lstat("dst/a"), a)
+
+# test_fs_sync__9_srcfile_dstfolder_*
+# rm -r src dst ; mkdir src dst dst/a ; touch src/a dst/a/b
+#   rsync src/ dst/ -> skip
+#   rsync --dirs src/ dst/ -> fail
+#   rsync --dirs --force src/ dst/ -> ok
+#   rsync --dirs --delete src/ dst/ -> ok
+#   rsync --delete src/ dst/ -> fail (delete doesn't work without dirs ou recursive)
+#   rsync --recursive src/ dst/ -> fail
+#   rsync --recursive --dirs src/ dst/ -> fail
+#   rsync --recursive --force src/ dst/ -> ok
+#   rsync --recursive --delete src/ dst/ -> ok
+# rm -r src dst ; mkdir src dst dst/a ; touch src/a
+#   rsync src/ dst/ -> skip
+#   rsync --dirs src/ dst/ -> ok
+#   rsync --delete src/ dst/ -> fail (delete doesn't work without dirs ou recursive)
+#   rsync --recursive src/ dst/ -> ok
+# rm -r src dst ; mkdir src dst dst/a ; touch dst/a/b
+#   rsync src/ dst/ -> skip
+#   rsync --delete src/ dst/ -> fail (delete doesn't work without dirs ou recursive)
+#   rsync --delete --dirs src/ dst/ -> ok (waw)
+#   rsync --recursive src/ dst/ -> skip
+#   rsync --recursive --delete src/ dst/ -> ok
+
+@fs_sync__tester
+def test_fs_sync__9_srcfile_dstfolder_1():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+  with open("src/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  f = lstat("src/a")
+  d = lstat("dst/a")
+  fs_sync("src", "dst", **rsync)  # skip dst/a
+  assert_equal(lstat("dst/a"), d)
+  assert_raise(OSError, lambda: fs_sync("src", "dst", dirs=True, **rsync))
+  assert_equal(lstat("dst/a"), d)
+  fs_sync("src", "dst", dirs=True, force=True, **rsync)
+  assert_equal(lstat("dst/a"), f)
+
+@fs_sync__tester
+def test_fs_sync__9_srcfile_dstfolder_2():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+  with open("src/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  f = lstat("src/a")
+  d = lstat("dst/a")
+  fs_sync("src", "dst", dirs=True, delete=True, **rsync)
+  assert_equal(lstat("dst/a"), f)
+
+@fs_sync__tester
+def test_fs_sync__9_srcfile_dstemptyfolder():
+  lstat = fs_sync__soft_lstat
+  with open("src/a", "wb") as f: pass
+  os.mkdir("dst/a")
+  rsync = dict(target_directory=True, source_directory=True)
+  f = lstat("src/a")
+  d = lstat("dst/a")
+  fs_sync("src", "dst", **rsync)  # skip dst/a
+  assert_equal(lstat("dst/a"), d)
+  fs_sync("src", "dst", dirs=True, **rsync)
+  assert_equal(lstat("dst/a"), f)
+
+@fs_sync__tester
+def test_fs_sync__9_srcfile_dstfolder_3():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+  with open("src/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  f = lstat("src/a")
+  d = lstat("dst/a")
+  assert_raise(ValueError, lambda: fs_sync("src", "dst", delete=True, **rsync))
+  assert_equal(lstat("dst/a"), d)
+  fs_sync("src", "dst", recursive=True, delete=True, **rsync)
+  assert_equal(lstat("dst/a"), f)
+
+@fs_sync__tester
+def test_fs_sync__9_srcfile_dstfolder_4():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+  with open("src/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  f = lstat("src/a")
+  d = lstat("dst/a")
+  assert_raise(OSError, lambda: fs_sync("src", "dst", recursive=True, **rsync))
+  assert_equal(lstat("dst/a"), d)
+  assert_raise(OSError, lambda: fs_sync("src", "dst", recursive=True, dirs=True, **rsync))
+  assert_equal(lstat("dst/a"), d)
+  fs_sync("src", "dst", recursive=True, force=True, **rsync)
+  assert_equal(lstat("dst/a"), f)
+
+@fs_sync__tester
+def test_fs_sync__9_srcabsent_dstfolder():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="dst")
+  rsync = dict(target_directory=True, source_directory=True)
+  d = lstat("dst/a")
+  fs_sync("src", "dst", **rsync)  # skip dst/a
+  assert_equal(lstat("dst/a"), d)
+  assert_raise(ValueError, lambda: fs_sync("src", "dst", delete=True, **rsync))
+  assert_equal(lstat("dst/a"), d)
+  fs_sync("src", "dst", verbose=3, delete=True, dirs=True, **rsync)  # waw
+  assert_equal(lstat("dst/a"), None)
+
+# test_fs_sync__10_srcfolder_dstfile_*
+# rm -r src dst ; mkdir src src/a dst ; touch src/a/b dst/a
+#   rsync src/ dst/ -> skip
+#   rsync --delete src/ dst/ -> fail (delete doesn't work without dirs ou recursive)
+#   rsync --dirs src/ dst/ -> ok
+#   rsync --recursive src/ dst/ -> ok
+
+@fs_sync__tester
+def test_fs_sync__10_srcfolder_dstfile_1():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  with open("dst/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  d = lstat("src/a")
+  f = lstat("dst/a")
+  fs_sync("src", "dst", **rsync)  # skip dst/a
+  assert_equal(lstat("dst/a"), f)
+  assert_raise(ValueError, lambda: fs_sync("src", "dst", delete=True, **rsync))
+  assert_equal(lstat("dst/a"), f)
+  fs_sync("src", "dst", dirs=True, **rsync)
+  assert_equal(lstat("dst/a"), d)
+
+@fs_sync__tester
+def test_fs_sync__10_srcfolder_dstfile_2():
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  with open("dst/a", "wb") as f: pass
+  rsync = dict(target_directory=True, source_directory=True)
+  d = lstat("src/a")
+  f = lstat("dst/a")
+  fs_sync("src", "dst", recursive=True, **rsync)
+  assert_equal(lstat("dst/a"), d)
+
+@fs_sync__tester
+def test_fs_sync__11_as_func():  # what a strange api ^^
+  lstat = fs_sync__soft_lstat
+  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  func = fs_sync("none", "unused",  times=True, as_func=True)
+  func((("src/a/b/c", "f"), ("dst", "f"), (None, None)))
+  assert_equal(lstat("src/a/b/c/f"), lstat("dst/f"))
+
+
+
 #@fs_sync__tester
 #def test_fs_sync__x_remove_source_non_empy_folder():
 #  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")

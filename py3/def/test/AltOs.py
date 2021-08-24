@@ -96,6 +96,13 @@ def test_AltOs__chroot_getcwd_5():
   altos.chroot("../private")
   assert_equal(altos.getcwd(), altos.sep)
 
+@AltOs_tester
+def test_AltOs__path_translation():
+  altos = AltOs(path=PathModule(sep=";", altsep=",", extsep="!", curdir="?", pardir="^"))
+  altos.mkdir("src;private")
+  altos.mkdir("src;private;lol")
+  assert_equal(altos.listdir("src;private"), ["lol"])
+  assert_equal(altos.listdir("src;private;^"), ["private"])
 
 # XXX test other methods*
 #     mount + chdir
