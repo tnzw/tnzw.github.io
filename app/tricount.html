@@ -5,7 +5,7 @@
     <meta name=viewport content="width=device-width,user-scalable=yes,initial-scale=1">
     <title>Tricount</title>
     <script>
-const BANNER=`tricount.html Version 0.2.0
+const BANNER=`tricount.html Version 0.3.0
 Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -190,7 +190,7 @@ function setHash(hash, dispatch) {
 function unsetHash() {
   if (!location.hash) return;
   if (history.state) history.back();  // cannot do a while (history.state) as history.back() is asynchronous, would need to wait for popstate event.
-  else history.pushState(null,'',location.href.replace(/#.*/, ""));
+  else { history.pushState(null,'',location.href.replace(/#.*/, "")); window.dispatchEvent(new Event("hashchange")); }
 }
 
 function genEntries() {
@@ -215,9 +215,10 @@ window.addEventListener("load", function () {
   document.body.appendChild(dce("div", [
     dce("div",{onlocationhashchange:"let ee=genEntries();this.innerHTML='';ee.forEach(el=>this.appendChild(el))"},genEntries()),
     dce("p",{onupdate:"let a=[];for(let [i,c] of enumerate(this.previousSibling.children)){let _=c.querySelectorAll('input');a.push([_[0].value||(i+1),(_[1].valueAsNumber*100)|0])}let t=tricount(a.map(v=>v[1]));this.textContent=Object.keys(t).map(k=>{let [j,i,c]=t[k];return `${a[j][0]||(j+1)} gives ${money(c)} to ${a[i][0]||(i+1)}`}).join(', ')||'Nothing to do'"}),
-    dce("button",["Share report"],{onclick:"eventShare.call(this, event, {title:strip(text(this.parentNode))+'\\n',url:location.href},'Error…')"})," ",
+    dce("button",["Share report"],{onclick:"eventShare.call(this, event, {title:'tricount',text:strip(text(this.parentNode)),url:location.href},'Error…')"})," ",
     dce("button",["Copy report"],{onupdate:"this.textContent='Copy report'", onclick: "eventCopyText.call(this,event,strip(text(this.parentNode)),'Report copied!','Error…')"})," ",
-    dce("button",["Copy url"],{onupdate:"this.textContent='Copy url';let a=[].map.call(this.parentNode.querySelectorAll('input'),e=>e.value);if(a.some(v=>v)){setHash(JSON.stringify(a))}else{unsetHash()}",onclick:"eventCopyText.call(this,event,location.href,'Url copied!','Error…')"})
+    dce("button",["Copy url"],{onupdate:"this.textContent='Copy url';let a=[].map.call(this.parentNode.querySelectorAll('input'),e=>e.value);if(a.some(v=>v)){setHash(JSON.stringify(a))}else{unsetHash()}",onclick:"eventCopyText.call(this,event,location.href,'Url copied!','Error…')"})," ",
+    dce("button",["Clear"],{onclick:"unsetHash()"})
   ]));
 
 });
