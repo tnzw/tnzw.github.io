@@ -1,4 +1,4 @@
-# os_copy_file_range.py Version 1.0.1
+# os_copy_file_range.py Version 1.1.0
 # Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -6,7 +6,7 @@
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
-def os_copy_file_range(src, dst, count, offset_src=None, offset_dst=None, *, os_module=None):
+def os_copy_file_range(src, dst, count, offset_src=None, offset_dst=None, *, try_native=False, os_module=None):
   """\
 A polyfill of `os.copy_file_range()`.
 
@@ -36,6 +36,13 @@ https://lwn.net/Articles/659523/
   # we should not use src/dst_os_module
   buffer_size = 32768  # XXX hardcoded
   if os_module is None: os_module = os
+  if try_native:
+    native_copy_file_range = getattr(os_module, "copy_file_range", None)
+    if native_copy_file_range is not None:
+      try: native_copy_file_range(src, dst, 0, 0, 0)  # testing the method
+      except OSError as e:
+        if e.errno != errno.ENOSYS: raise  # hm… I wish I had no try…except.
+      else: return native_copy_file_range(src, dst, count, offset_src, offset_dst)
   if offset_src is None: offset_src = os_module.lseek(src, 0, os_module.SEEK_CUR)
   if offset_dst is None: offset_dst = os_module.lseek(dst, 0, os_module.SEEK_CUR)
   SEEK_SET = os_module.SEEK_SET

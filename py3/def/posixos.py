@@ -1,5 +1,5 @@
-# posixos.py Version 1.1.0
-# Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
+# posixos.py Version 1.1.1
+# Copyright (c) 2021-2022 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -208,7 +208,14 @@ letter_drive_names => ("cygdrive",):
     def symlink(self, *a, **opt): return self._call_path2("symlink", *a, **opt)
     def unlink(self, *a, **opt): return self._call_pathorfd("unlink", *a, **opt)
     remove = unlink
-    def lseek(self, *a, **opt): return self.os.lseek(*a, **opt)
+    def lseek(self, fd, pos, how):
+      if   how == self.SEEK_CUR: how = self.os.SEEK_CUR
+      elif how == self.SEEK_SET: how = self.os.SEEK_SET
+      elif how == self.SEEK_END: how = self.os.SEEK_END
+      return self.os.lseek(fd, pos, how)
+    SEEK_CUR = 1
+    SEEK_END = 2
+    SEEK_SET = 0
     def read(self, *a, **opt): return self.os.read(*a, **opt)
     def write(self, *a, **opt): return self.os.write(*a, **opt)
     def fsync(self, *a, **opt): return self.os.fsync(*a, **opt)
@@ -312,4 +319,4 @@ letter_drive_names => ("cygdrive",):
   posixos.path = posixos.path(posixos)
   return posixos
 posixos = posixos()
-posixos._required_globals = ["os", "DirEntry", "ScandirIterator", "open2", "os_strerror", "tuplepath"]
+posixos._required_globals = ["os", "posixpath", "DirEntry", "ScandirIterator", "open2", "os_strerror", "tuplepath"]

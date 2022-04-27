@@ -1,4 +1,4 @@
-# Base64Encoder.py Version 1.0.0
+# Base64Encoder.py Version 1.0.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -6,6 +6,8 @@
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
+# could be easily python codec compatible
+# see https://docs.python.org/3/library/codecs.html#incremental-encoding-and-decoding
 class Base64Encoder(object):
   """\
 Base64Encoder(**opt)
@@ -15,10 +17,9 @@ opt:
          => (default) "standard" (or STANDARD_SCHEME)
          => "url" (or URL_SCHEME)
          => <CUSTOM_SCHEME> (`compute_scheme(codes, padding)`)
-  cast => bytes: (default) cast the returned transcoded values to bytes.
-       => None : do not cast, returns transcoded byte iterator instead.
-  cache    : internal use only.
-  state    : internal use only.
+  cast => bytes : (default) cast the returned transcoded values to bytes.
+       => None  : do not cast, returns transcoded byte iterator instead.
+  state : internal use only.
 
 Interfaces:
 - copyable (ie. `copy()`)
@@ -37,10 +38,9 @@ opt:
   STANDARD_SCHEME = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
   URL_SCHEME = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_='
   def copy(self): return self.__class__(**{k: v for k, v in self.__dict__.items()})
-  def __init__(self, *, errors="strict", scheme="standard", cast=bytes, cache=0, state=0):
+  def __init__(self, *, errors="strict", scheme="standard", cast=bytes, state=0):
     self.scheme = {"standard": self.STANDARD_SCHEME, "url": self.URL_SCHEME}.get(scheme, scheme)
     self.cast = cast
-    self.cache = cache
     self.state = state
   def transcode(self, iterable=None, *, stream=False):
     """\
@@ -51,7 +51,8 @@ opt:
   stream => False: tells the transcoder that it is the last transcode operation
          => True
 """
-    if iterable is None: iterable = ()
+    if iterable is None: iterator = ()
+    else: iterator = iter(iterable)
     # states are:
     # 0 => [?..]
     # 1 => [A?.]
@@ -59,9 +60,10 @@ opt:
 
     def it():
       scheme = self.scheme
-      cache, state = self.cache, self.state
+      state = self.state
+      cache, state = state >> 8, state & 0xFF
 
-      for b in iterable:
+      for b in iterator:
         if state == 0:  # [?..]
           yield scheme[b >> 2]
           cache, state = b, 1
@@ -74,7 +76,7 @@ opt:
           cache, state = 0, 0
 
       if stream:
-        self.cache, self.state = cache, state
+        self.state = ((cache & 0xFF) << 8) | state
         return
 
       if state == 0: pass
@@ -85,6 +87,6 @@ opt:
         yield scheme[(cache & 0xF) << 2]
         if scheme[64:65]: yield scheme[64]
       cache, state = 0, 0
-      self.cache, self.state = cache, state
+      self.state = ((cache & 0xFF) << 8) | state
     return it() if self.cast is None else self.cast(it())
   encode = transcode

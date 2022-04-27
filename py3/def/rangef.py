@@ -1,4 +1,4 @@
-# rangef.py Version 1.0.0
+# rangef.py Version 1.0.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -31,10 +31,12 @@ class rangef(tuple):
     raise TypeError("rangef expected at most 3 arguments, got " + str(la))
 
   def index(self, x):
+    v = x
     try:
       v -= self.start
       index, m = divmod(v, self.step)
-      if m or v >= self.stop: raise ValueError(f"{x!r} is not in range")
+      if m or self.step > 0 and (self.start > x or x >= self.stop) or self.step < 0 and (self.start < x or x <= self.stop):
+        raise ValueError(f"{x!r} is not in range")
       return int(index)
     except TypeError: pass
     raise ValueError(f"sequence.index(x): x not in sequence")

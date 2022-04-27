@@ -1,4 +1,4 @@
-# FileIO.py Version 2.1.1
+# FileIO.py Version 2.1.1-2
 # Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -151,4 +151,4 @@ class FileIO(object):
       w += i
     return w
 
-FileIO._required_globals = ["errno", "os", "io_parsemode"]
+FileIO._required_globals = ["errno", "os", "RawIOBase", "io_parsemode"]

@@ -2,12 +2,12 @@
   "use strict";
   if (typeof global.Blob === "undefined")
 
-global.Blob = (function script() {
+global.Blob = (function () { try { return require("buffer").Blob } catch (_) {} })() || (function script() {
   "use strict";
 
-  /*! Blob-nodejs.js Version 1.0.0
+  /*! Blob-nodejs.js Version 1.1.0
 
-      Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2019, 2022 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -88,6 +88,13 @@ global.Blob = (function script() {
     n._data = this._data.slice(start, end);
     n.size = n._data.length;
     return n;
+  };
+
+  Blob.prototype.arrayBuffer = async function () {
+    return this._readAsArrayBuffer();
+  };
+  Blob.prototype.text = async function () {
+    return this._readAsText();
   };
 
   Blob.prototype._readAsBuffer = function () {

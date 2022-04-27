@@ -5,7 +5,7 @@
     <meta name=viewport content="width=device-width,user-scalable=yes,initial-scale=1">
     <title>CodeMirror 5</title>
     <script>
-const BANNER=`codemirror5.html Version 0.1.0b
+const BANNER=`codemirror5.html Version 0.1.1b
 Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -62,8 +62,8 @@ window.addEventListener("load", function () {
           //CodeMirror6 o={changes:{from:0,to:this.editor.state.doc.length,insert:data}};
           o={changes:{from:0,insert:data}};
         }
-        //CodeMirror6 if(ol)this.editor.dispatch(o);
-        if(ol)this.editor.setValue(o.changes.insert);
+        //CodeMirror6 if(ol){this.editor.dispatch(o);this.editor.clearHistoryXXX()}
+        if(ol){this.editor.setValue(o.changes.insert);this.editor.clearHistory()}
         mix(s, n);  // set state
         if(updatetitle){
           updatetitle=TITLE;
@@ -204,7 +204,7 @@ window.addEventListener("load", function () {
     },
     commands: {
       "":(cm,cmd)=>alert(`unknown command ${cmd}`),
-      help(){alert(Object.keys(appCommands))},
+      help(){alert(Object.keys(app.commands))},
       eval(cm,cmd){try{eval(cmd.slice(0,5))}catch(err){alert(err&&(err.stack?err.stack:err.message?err.message:err))}},
       evalfile(cm){try{if(app.state.mode!=="javascript")throw {message:"Error: not in javascript mode"};eval(app.getContent())}catch(err){alert(err&&(err.stack?err.stack:err.message?err.message:err))}},
       mode(cm,cmd,args){if(args[1]===undefined)return alert(app.state.mode);app.dispatch({mode:args[1]})},

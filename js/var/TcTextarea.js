@@ -1,9 +1,9 @@
 this.TcTextarea = (function script() {
   "use strict";
 
-  /*! TcTextarea.js Version 1.2.0
+  /*! TcTextarea.js Version 1.2.1
 
-      Copyright (c) 2016-2019 Tristan Cavelier <t.cavelier@free.fr>
+      Copyright (c) 2016-2019, 2021 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
       the extent permitted by applicable law. You can redistribute it
       and/or modify it under the terms of the Do What The Fuck You Want
@@ -32,7 +32,7 @@ this.TcTextarea = (function script() {
   TcTextarea.keyMap.default = {fallthrough: "basic"};
   TcTextarea.optionHandlers = {};
   TcTextarea.modes = {};
-  TcTextarea.version = "20190630";
+  TcTextarea.version = "20211125";
   TcTextarea.prototype.getWrapperElement = function () { return this._textarea; };
   TcTextarea.prototype.getTextArea = function () { return this._textarea; };
   TcTextarea.prototype.toTextArea = function () { return; };
@@ -100,11 +100,17 @@ this.TcTextarea = (function script() {
         }
     }
   };
+  TcTextarea.prototype.handleEvent.input = function (event) {
+    // for now, this listener "input" is only used to delete autocomplete cache
+    this._textarea.removeEventListener("input", this);
+    delete this._autocompleteWordVars;
+  };
   TcTextarea.prototype.startEventHandling = function () {
     this._textarea.addEventListener("keydown", this, false);  // use capture ?
   };
   TcTextarea.prototype.stopEventHandling = function () {
     this._textarea.removeEventListener("keydown", this, false);  // use capture ?
+    this._textarea.removeEventListener("input", this);
   };
 
   // Textarea utils //
@@ -213,8 +219,8 @@ this.TcTextarea = (function script() {
     document.execCommand("insertText", false, replacement);
     textarea.setSelectionRange(cstart, cend, dir);
   };
-  TcTextarea.prototype.setRangeText = (typeof navigator !== "undefined" && /Firefox\//.test(navigator.userAgent)) ?
-    TcTextarea.prototype._setRangeTextNative :
+  TcTextarea.prototype.setRangeText = //(typeof navigator !== "undefined" && /Firefox\//.test(navigator.userAgent)) ?
+    //TcTextarea.prototype._setRangeTextNative :
     TcTextarea.prototype._setRangeTextWithExecCommand;
   TcTextarea.prototype.setSelectionRange = function (start, end, direction) {
     this._textarea.setSelectionRange(start, end, direction);
@@ -432,7 +438,8 @@ this.TcTextarea = (function script() {
 
   TcTextarea.prototype.autocompleteWordAtCursor = function (reverse) {
     // XXX when selecting ??
-    var textarea = this._textarea, vars = this._autocompleteWordVars, cursor = this.getCursorPosition(), wordsDict = {}, words, index, firstText, lastText, wordPart, lastWordPart, re;
+    var that = this, textarea = this._textarea, vars = this._autocompleteWordVars, cursor = this.getCursorPosition(),
+        wordsDict = {}, words, index, firstText, lastText, wordPart, lastWordPart, re;
     function add(word) {
       delete wordsDict[word];
       wordsDict[word] = null;
@@ -448,8 +455,10 @@ this.TcTextarea = (function script() {
         if (index > 0) { index -= 1; } else { index = vars.words.length - 1; }
       }
       if (vars.lastWord === vars.words[index]) { return false; }
+      textarea.removeEventListener("input", this);
       this.setRangeText(vars.words[index], cursor - vars.lastWord.length, cursor, "end");
       vars.lastPosition = cursor - vars.lastWord.length + vars.words[index].length;
+      setTimeout(function () { textarea.addEventListener("input", that, {passive: true}); });
       vars.lastWord = vars.words[index];
       vars.index = index;
     } else {
@@ -464,6 +473,7 @@ this.TcTextarea = (function script() {
       if (!words.length) { return false; }
       index = reverse ? 0 : words.length - 1;
       lastWordPart = words[index].slice(wordPart.length);
+      textarea.removeEventListener("input", this);
       this.setRangeText(lastWordPart, cursor, textarea.value.length - lastText.length, "end")
       cursor = cursor + lastWordPart.length;
       this._autocompleteWordVars = {
@@ -472,6 +482,7 @@ this.TcTextarea = (function script() {
         words: words,
         index: index
       };
+      setTimeout(function () { textarea.addEventListener("input", that, {passive: true}); });
     }
     return true;
   }
@@ -612,7 +623,7 @@ this.TcTextarea = (function script() {
       colpos = tt.getCursorColumnPosition();
       length = tt.getCursorLine().length;
       if (colpos < length) { tt._commandGoLineState = colpos; }
-      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; } 
+      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; }
       tt.setCursorPosition(tt.getCursorLineDownPosition(tt._commandGoLineState), event.shiftKey);
     }
     tt.workaroundScroll();
@@ -625,7 +636,7 @@ this.TcTextarea = (function script() {
       colpos = tt.getCursorColumnPosition();
       length = tt.getCursorLine().length;
       if (colpos < length) { tt._commandGoLineState = colpos; }
-      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; } 
+      else if (tt._commandGoLineState < length) { tt._commandGoLineState = length; }
       tt.setCursorPosition(tt.getCursorLineUpPosition(tt._commandGoLineState), event.shiftKey);
     }
     tt.workaroundScroll();

@@ -2,9 +2,9 @@
 <html><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
-<!-- Please, do not put any critical values here, it's not encrypted. Thanks -->
+<!-- Please, do not put any critical values in <head/>, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.4.0
+const banner=`Page.html Version 2.4.1
 Copyright (c) 2019-2021 Tristan Cavelier <t.cavelier@free.fr>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -20,6 +20,8 @@ const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,l
 const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
 const exportPreferenceKeys=["lang"];
 
+// prevent default Ctrl-S Ctrl-O: fixes bug saving wrong page when editor Ctrl-S throws for any reason.
+window.addEventListener('keydown',function(e){if(e.ctrlKey&&({s:1,o:1})[e.key.toLowerCase()])e.preventDefault()},{capture:true});
 window.addEventListener('load',function(){
   setTimeout(_=>console.log(`/!\\ STOP /!\\
 This is a browser feature intended for
@@ -32,7 +34,7 @@ such as your passwords.`),500);
   const div=dce.bind(0,"div"),span=dce.bind(0,"span"),button=dce.bind(0,"button"),select=dce.bind(0,"select"),option=dce.bind(0,"option");
   window.app={
     element:null,editor:null,
-    hasNwJs:typeof nw!=='undefined'&&typeof require!=='undefined',
+    hasNwJs:typeof nw==='object'&&nw!==null&&typeof require==='function',
     editableExtMimeDict:{bmp:'image/bmp',css:'text/css',gif:'image/gif',htm:'text/html',html:'text/html',jpeg:'image/jpeg',jpg:'image/jpeg',js:'application/javascript',png:'image/png',svg:'image/svg+xml',svgz:'image/svg+xml',tiff:'image/tiff',txt:'text/plain',xhtml:'text/html'},
     loadableExtMimeDict:{flac:'audio/flac',ogg:'audio/ogg',opus:'audio/ogg;codec=opus',pdf:'application/pdf',mp3:'audio/mpeg',mp4:'video/mp4',wav:'audio/wav',webm:'video/webm'},//zip:'application/zip'
     state:{},update(m){let frz=Object.freeze,o={},n={},u={};if('password' in m){this.crypto.setPassword(m.password)}for(let k of Object.keys(m||0))if(m[k]!==this.state[k]){o[k]=this.state[k];this.state[k]=n[k]=m[k];u[k]=1}if(Object.keys(n).length){let ev=frz({type:'appupdate',target:this,updates:frz(n),updated:frz(o),isupdated:frz(u)});for(let el of this.element.querySelectorAll('[onappupdate]'))new Function('event',el.getAttribute('onappupdate')).call(el,ev)}},
@@ -197,7 +199,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
           option({value:"n",onselect:"this.parentNode.value='';app.clearFile();app.update({mainbar:'title'})"},"Clear")
         ]),select([
           option({value:"",selected:"selected"},"View"),
-          option({value:"t",onselect:"this.parentNode.value='';app.update({showtaglevels:!app.state.showtaglevels,mainbar:'title'})",onappupdate:"let u=event.updates;if('showtaglevels' in u)this.textContent='Tags '+(u.showtaglevels?'☑':'☐')"},"Tags ☐"),
+          option({value:"t",accesskey:"t",onselect:"this.parentNode.value='';app.update({showtaglevels:!app.state.showtaglevels,mainbar:'title'})",onappupdate:"let u=event.updates;if('showtaglevels' in u)this.textContent='Tags '+(u.showtaglevels?'☑':'☐')"},"Tags ☐"),
           option({value:"s",onselect:"this.parentNode.value='';app.editor.innerHTML=app.mkSourceEditionHTML(app.editor.innerHTML);app.update({contenteditable:0,mainbar:'title'})"},"Source"),
         ]),select([
           option({value:"",selected:"selected"},"?"),
@@ -272,7 +274,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
         ])]),
         span({style:"flex-grow:2"},[select([
           option({value:"",selected:"selected"},"…"),
-          option({value:"l",ctrlshiftkey:"l",onselect:"this.parentNode.value='';app.editor.ctlInsertLink()"},"Insert link…"),
+          option({value:"l",ctrlkey:"k",onselect:"this.parentNode.value='';app.editor.ctlInsertLink()"},"Insert link…"),
           option({value:"i",onselect:"this.parentNode.value='';app.editor.ctlInsertImage()"},"Insert image…"),
           option({value:"t",onselect:"this.parentNode.value='';app.editor.ctlInsertFile()"},"Insert file…"),
           option({value:"u",onselect:"this.parentNode.value='';app.editor.ctl('undo')"},"Undo"),
@@ -439,7 +441,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
     body>div[name=app]>div[name=editor]{background-color:#FFF}
     body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:0.5in;margin:1em 0 0 0}
     body>div[name=app]>div[name=editor].pageformat-fullwidth{min-height:10em}
-    body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(185,106,0,0.1);box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)}
+    body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(200,200,0,0.1);outline:1px gray dotted;/*box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)*/}
   }
 
   *{box-sizing:border-box;max-width:100%}

@@ -1,4 +1,4 @@
-# ArrayOnFile.py Version 1.1.1
+# ArrayOnFile.py Version 1.1.2
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -204,13 +204,8 @@ class ArrayOnFile(tuple):
       return self
     SEEK_END = os.SEEK_END
     l = os.lseek(fd, 0, SEEK_END)
-    copy_file_range = getattr(os, "copy_file_range", os_copy_file_range)
-    try: copy_file_range(fd, fd, 0, 0, 0)  # testing the method
-    except OSError as e:
-      if e.errno != errno.ENOSYS: raise  # hm… I wish I had no try…except.
-      copy_file_range = os_copy_file_range
     for i in range(1, other, 1):
-      copy_file_range(fd, fd, l, 0, l * i)
+      os_copy_file_range(fd, fd, l, 0, l * i, try_native=True, os_module=os)
     return self
 
   def __setitem__(self, key, item):
@@ -248,7 +243,7 @@ class ArrayOnFile(tuple):
       else:
         for i, v in zip(range(start, stop, step), item):
           os.lseek(fd, i, os.SEEK_SET)
-          os.write(fd, bytes((v,))[:1])
+          os.write(fd, bytes((v,)))
       if resize < 0: os.truncate(fd, os.lseek(fd, 0, os.SEEK_CUR))
       return
     key = self.getrange()[key]

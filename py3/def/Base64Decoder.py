@@ -1,4 +1,4 @@
-# Base64Decoder.py Version 1.1.0-2
+# Base64Decoder.py Version 1.2.1
 # Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -6,23 +6,25 @@
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
+# could be easily python codec compatible
+# see https://docs.python.org/3/library/codecs.html#incremental-encoding-and-decoding
 class Base64Decoder(object):
   """\
 Base64Decoder(**opt)
 
 opt:
-  errors => "strict"          : (default) raise on any error
-         => "pad"             : add base64 padding before EOF if necessary (eg b"RS" → b"RS==")
-         => "ignore"          : ignore unexpected characters
-                                ex: b"R=K==A=B=L~OZ" → b"RK==ABLO"
+  errors => "strict" : (default) raise on any error
+         => "pad"    : add base64 padding before EOF if necessary (eg b"RS" → b"RS==")
+         => "ignore" : ignore unexpected characters
+                       ex: b"R=K==A=B=L~OZ" → b"RK==ABLO"
   scheme : The scheme to use bytes(256)
-         => (default) "standard" (or STANDARD_SCHEME)
-         => "url" (or URL_SCHEME)
+         => (default) "standard" or STANDARD_SCHEME
+         => "url" or URL_SCHEME
+         => "mixed_url" or MIXED_URL_SCHEME (combines "standard" and "url" schemes)
          => <CUSTOM_SCHEME> (`compute_scheme(codes, padding, ignored)`)
-  cast => bytes: (default) cast the returned transcoded values to bytes.
-       => None : do not cast, returns transcoded byte iterator instead.
-  cache    : internal use only.
-  state    : internal use only.
+  cast => bytes : (default) cast the returned transcoded values to bytes.
+       => None  : do not cast, returns transcoded byte iterator instead.
+  state : internal use only.
 
 Interfaces:
 - copyable (ie. `copy()`)
@@ -38,19 +40,19 @@ opt:
   ignored => b" \n\r\t": ignores each one of these bytes from input
   padding => b"="      : each one of these bytes may be concidered as padding
 """
-    struct = bytearray([255] * 256)
+    struct = bytearray(b'\xff' * 256)
     for _ in ignored: struct[_] = 65
     for _ in padding: struct[_] = 64
     for i, _ in enumerate(codes): struct[_] = i
     return bytes(struct)
   STANDARD_SCHEME = b'\xff\xff\xff\xff\xff\xff\xff\xff\xffAA\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff>\xff\xff\xff?456789:;<=\xff\xff\xff@\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\xff\xff\xff\xff\xff\xff\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
   URL_SCHEME = b'\xff\xff\xff\xff\xff\xff\xff\xff\xffAA\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff>\xff\xff456789:;<=\xff\xff\xff@\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\xff\xff\xff\xff?\xff\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+  MIXED_URL_SCHEME = b'\xff\xff\xff\xff\xff\xff\xff\xff\xffAA\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xffA\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff>\xff>\xff?456789:;<=\xff\xff\xff@\xff\xff\xff\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\xff\xff\xff\xff?\xff\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./0123\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
   def copy(self): return self.__class__(**{k: v for k, v in self.__dict__.items()})
-  def __init__(self, *, errors="strict", scheme="standard", cast=bytes, cache=0, state=0):
+  def __init__(self, *, errors="strict", scheme="standard", cast=bytes, state=0):
     self.errors = errors
-    self.scheme = {"standard": self.STANDARD_SCHEME, "url": self.URL_SCHEME}.get(scheme, scheme)
+    self.scheme = {"standard": self.STANDARD_SCHEME, "url": self.URL_SCHEME, "mixed_url": self.MIXED_URL_SCHEME}.get(scheme, scheme)
     self.cast = cast
-    self.cache = cache
     self.state = state
   def transcode(self, iterable=None, *, stream=False):
     """\
@@ -76,7 +78,8 @@ opt:
     def it():
       #errors, scheme, ignored, padding = self.errors, self.scheme[:64], self.ignored, self.padding
       errors, scheme = self.errors, self.scheme
-      cache, state = self.cache, self.state
+      state = self.state
+      cache, state = state >> 8, state & 0xFF
 
       for b in iterable:
         code = scheme[b]
@@ -103,7 +106,7 @@ opt:
               raise ValueError("invalid code")
 
       if stream:
-        self.cache, self.state = cache, state
+        self.state = ((cache & 0xFF) << 8) | state
         return
 
       if state == 0: pass
@@ -115,6 +118,6 @@ opt:
         check_errors(errors)
         raise ValueError("unexpected end of data")
 
-      self.cache, self.state = cache, state
+      self.state = ((cache & 0xFF) << 8) | state
     return it() if self.cast is None else self.cast(it())
   decode = transcode

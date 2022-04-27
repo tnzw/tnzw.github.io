@@ -107,6 +107,10 @@ def test_ArrayOnFile_resizing__setitem__():
     fb[20:] = b"hello"
     fw[20:] = b"hello"
     assert_equal(fw, fb)  # fw[20:] = b"hello"
+    #fb[:19:-1] = b"heya"  # ValueError: attempt to assign bytes of size 4 to extended slice of size 5  # XXX interesting
+    fb[:19:-1] = b"hella"
+    fw[:19:-1] = b"hella"
+    assert_equal(fw, fb)  # fw[20:] = b"alleh"
     # truncate 0
     fb[:] = b""
     fw[:] = b""

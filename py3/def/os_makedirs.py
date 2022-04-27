@@ -1,4 +1,4 @@
-# os_makedirs.py Version 1.0.1
+# os_makedirs.py Version 1.0.1-2
 # Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -16,7 +16,7 @@ os_makedirs(path, **opt)
                       N=1 => will create "/dir/a/b" and "/dir/a/b/c"
                       N=2 => will create "/dir/a", "/dir/a/b" and "/dir/a/b/c"
                       ...
-                      N<=1 => will create all folders (eg. "/dir", "/dir/a", "/dir/a/b", "/dir/a/b/c")
+                      N<=-1 => will create all folders (eg. "/dir", "/dir/a", "/dir/a/b", "/dir/a/b/c")
   os_module => None : The module to use as os (if None, it uses the 'os' module)
 """
   if os_module is None: os_module = os
