@@ -1,5 +1,5 @@
-# AltOs.py Version 1.2.0
-# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
+# AltOs.py Version 1.2.1
+# Copyright (c) 2020-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -7,7 +7,7 @@
 # http://www.wtfpl.net/ for more details.
 
 class AltOs(object):
-  """\
+  '''\
 Same as os module but with:
 - fsdecode uses str.decode("UTF-8", "strict") on every platform by defaults
 - uses internal getcwd() mechanism
@@ -16,10 +16,11 @@ Same as os module but with:
 - chroot() works on windows
 - chroot() automatically changes cwd to b"/" if chroot is child of cwd
 - chown() is equal to noop on windows (but can still use chown() on mounted OSes)
-- you can mount other "os" with alt_os.mount("/mnt", FtpOs("url", "usr", "pwd"))
-    however, "/mnt" is still part of os, not FtpOs.
+- you can mount other "os" with `AltOs().mount("/mnt", FtpOs("url", "usr", "pwd"))`
+    however, the path "/mnt" is still part of `os`, not `FtpOs`.
 - /!\\ symlinks are followed to the same mount point (os following) instead of following in AltOs moint points
-"""
+- /!\\ readlink may have unexpected behavior (so far)
+'''
   # https://docs.python.org/3/library/os.html
 
   _proc_fd = None
@@ -38,7 +39,7 @@ Same as os module but with:
   def __init__(self, *, name=None, path=None, cwd=None, umask=0o000, root=None, fsencoding=None, fsencodeerrors=None, path_module=None, os_module=None):
     self.os = os if os_module is None else os_module
     self.linesep = self.os.linesep
-    if name is None: name = self.os.name
+    if name is None: name = self.os.name  # XXX use f'alt_os.{self.os.name}' instead?
     if not isinstance(name, str): raise TypeError("expected str for alt_os.name")
     self.name = name
     if fsencoding: self._fsencoding = fsencoding
@@ -118,7 +119,8 @@ Same as os module but with:
       "realpath": self._realpath(subpath),  # used by scandir()
     }
     fd = self._next_fd()
-    self._proc_fd[fd] = fds
+    while self._proc_fd.setdefault(fd, fds) is not fds:  # try to prevent concurrency issues
+      fd = self._next_fd()
     return fd
 
   O_RDONLY    = 0x000
@@ -196,19 +198,24 @@ Same as os module but with:
   def replace(self, src, dst, *, src_dir_fd=None, dst_dir_fd=None): return self._call_srcdst("replace", src, dst, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
   def rmdir(self, path, *, dir_fd=None): return self._call_path("rmdir", path, dir_fd=dir_fd)
   def scandir(self, path="."):
-    #return self._call_pathorfd("scandir", path)
-    fullpath = None
-    if isinstance(path, int):
-      if path in self._proc_fd:
-        realpath = self._proc_fd[path]["realpath"]
-        if realpath[:len(self._proc_root)] == self._proc_root: fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
-      scan = self._call_fd("scandir", path)
-      return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, dir_fd=path, os_module=self) for _ in scan))
-    realpath = self._realpath(path)
-    fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
-    scan = self._call_path("scandir", path)
-    return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, os_module=self) for _ in scan))
-    # XXX should DirEntry.path (or next DirEntry.path) vary while chrooting during a scan ?
+    scan = None
+    try:
+      #return self._call_pathorfd("scandir", path)
+      fullpath = None
+      if isinstance(path, int):
+        if path in self._proc_fd:
+          realpath = self._proc_fd[path]["realpath"]
+          if realpath[:len(self._proc_root)] == self._proc_root: fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
+          scan = self._call_fd("scandir", path)
+          return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, dir_fd=path, os_module=self) for _ in scan))
+      realpath = self._realpath(path)
+      fullpath = realpath[len(self._proc_root):].replace(root=self.sep)
+      scan = self._call_path("scandir", path)
+      return ScandirIterator(scan, (DirEntry(name=_.name, path=None if fullpath is None else fullpath.extend(_.name).pathname, os_module=self) for _ in scan))
+      # XXX should DirEntry.path (or next DirEntry.path) vary while chrooting during a scan ?
+    except:
+      if scan is not None: scan.close()
+      raise
   def stat(self, path, *, dir_fd=None, follow_symlinks=True): return self._call_pathorfd("stat", path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
   def symlink(self, src, dst, target_is_directory=False, *, dir_fd=None): return self._call_srcdst("symlink", src, dst, target_is_directory=target_is_directory, dst_dir_fd=dir_fd)
   def sync(self):
@@ -274,7 +281,7 @@ Same as os module but with:
 
   # Helpers
 
-  def _next_fd(self):  # XXX not cocurrent safe
+  def _next_fd(self):  # not concurrent safe, use with care
     fd = self._FD_START
     while fd in self._proc_fd: fd += 1
     return fd

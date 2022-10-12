@@ -1,5 +1,5 @@
-# Base64Encoder.py Version 1.0.1
-# Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
+# Base64Encoder.py Version 1.1.0
+# Copyright (c) 2021-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -39,8 +39,18 @@ opt:
   URL_SCHEME = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_='
   def copy(self): return self.__class__(**{k: v for k, v in self.__dict__.items()})
   def __init__(self, *, errors="strict", scheme="standard", cast=bytes, state=0):
-    self.scheme = {"standard": self.STANDARD_SCHEME, "url": self.URL_SCHEME}.get(scheme, scheme)
-    self.cast = cast
+    # scheme
+    self.scheme = {
+      "standard": self.STANDARD_SCHEME,
+      "url": self.URL_SCHEME,
+    }.get(scheme, scheme)
+    # cast
+    self.cast = {
+      'bytes': bytes,
+      'bytearray': bytearray,
+      'generator': None,
+    }.get(cast, cast)
+    # state
     self.state = state
   def transcode(self, iterable=None, *, stream=False):
     """\

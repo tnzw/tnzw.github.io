@@ -1,5 +1,5 @@
-# posixos.py Version 1.1.1
-# Copyright (c) 2021-2022 Tristan Cavelier <t.cavelier@free.fr>
+# posixos.py Version 1.1.1-2
+# Copyright (c) 2021-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -319,4 +319,4 @@ letter_drive_names => ("cygdrive",):
   posixos.path = posixos.path(posixos)
   return posixos
 posixos = posixos()
-posixos._required_globals = ["os", "posixpath", "DirEntry", "ScandirIterator", "open2", "os_strerror", "tuplepath"]
+posixos._required_globals = ["os", "posixpath", "stat", "DirEntry", "ScandirIterator", "open2", "os_strerror", "tuplepath"]

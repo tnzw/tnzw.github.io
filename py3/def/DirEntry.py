@@ -1,5 +1,5 @@
-# DirEntry.py Version 1.2.0
-# Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
+# DirEntry.py Version 1.2.1
+# Copyright (c) 2021-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -32,3 +32,4 @@ class DirEntry(object):
     if self._lstat: return self._lstat
     self._lstat = self.os.stat(self.path, dir_fd=self.dir_fd, follow_symlinks=False)
     return self._lstat
+DirEntry._required_globals = ['os', 'stat']

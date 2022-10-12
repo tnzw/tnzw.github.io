@@ -244,3 +244,6 @@ def test_tuplepath__join():
   assert_equal(tp.fromrootnames("").join(tp.fromrootnames("")).pathname, ntpath.join("", ""))
   assert_equal(tp.fromrootnames("", "a", "", "", "b", "", "", "").join(tp.fromrootnames("", "c", "", "", "d")).pathname, ntpath.join("a\\\\\\b\\\\\\", "c\\\\\\d"))
   assert_equal(tp.fromrootnames("", "a", "", "", "b", "", "", "").join(tp.fromrootnames("\\", "c", "", "", "d")).pathname, ntpath.join("a\\\\\\b\\\\\\", "\\c\\\\\\d"))
+  assert_equal(tp.fromrootnames("R:\\", "a", "", "", "b", "", "", "").join(tp.fromrootnames("\\", "c", "", "", "d")).pathname, ntpath.join("R:\\a\\\\\\b\\\\\\", "\\c\\\\\\d"))
+
+  assert_equal(tp("\\abspath").join(b"\\abspath").pathname, ntpath.join(b"\\abspath"))

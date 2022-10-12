@@ -1,5 +1,5 @@
-# tuplepath.py Version 2.1.0
-# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
+# tuplepath.py Version 2.1.2
+# Copyright (c) 2020-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -36,7 +36,7 @@ The keywords arguments are the same as in the constructor (see above).
 You can compare to pathes by using `==`, it compares rootnames and names even
 on different representation of the path. Exemple on windows :
 
-    >>> print(tuplepath("a\\b\\c") == tuplepath("a/b/c"))
+    >>> tuplepath("a\\b\\c") == tuplepath("a/b/c")
     True
 
 You can iter through the path components:
@@ -54,6 +54,8 @@ Or get the names directly:
     "/a/b"
     >>> tuplepath("/a/b/c")[1:]
     "b/c"
+    >>> tuplepath("/a/b/c").names
+    ('a', 'b', 'c')
 """
   __slots__ = ()
   # ((rootname, *names), os_module)
@@ -64,7 +66,7 @@ Or get the names directly:
   def fromrootnames(cls, *rootnames, os_module=None):
     "fromrootnames(*fstuple)"
     if rootnames: return cls(root=rootnames[0], names=rootnames[1:], os_module=os_module)
-    return cls()
+    return cls(os_module=os_module)
 
   def __new__(cls, *a, **opt):
     if a[1:]: raise TypeError(f"tuplepath() takes 1 positional argument but {len(a)} were given")
@@ -314,14 +316,22 @@ use join for such a result -> tuplepath("C:/a").join("D:/b") -> "D:/b"
   def isabs(self): return True if self.rootname else False
 
   def join(self, path, *paths):
-    srootname, snames = self.rootname, self.names
+    sdrivename = self.drivename
+    srootname, snames = self.rootname[len(sdrivename):], self.names
     for path in (path,) + paths:
       path = self.replace(path=path)
-      if path.isabs(): srootname, snames = path.rootname, path.names
+      if path.isabs():
+        pdrivename = path.drivename
+        if pdrivename:
+          sdrivename = pdrivename
+          srootname, snames = path.rootname[len(pdrivename):], path.names
+        else:
+          srootname, snames = path.rootname, path.names
       elif path.names:
         if snames and not snames[-1]: snames = snames[:-1] + path.names
         else: snames += path.names
-    return self.replace(root=srootname, names=snames)
+    anchor = sdrivename + srootname if sdrivename else srootname
+    return self.replace(root=anchor, names=snames)
 
   def norm(self):
     return self.replace(path=self.os.path.normpath(self))
@@ -359,7 +369,7 @@ use join for such a result -> tuplepath("C:/a").join("D:/b") -> "D:/b"
   def replace(self, **opt):
     if "os_module" not in opt: opt["os_module"] = self._os
     if "path" not in opt: opt["path"] = self
-    return self.__class__(**opt)
+    return tuplepath(**opt)
 
   def sibling(self, path, *paths): return self.dir().join(path, *paths)
 

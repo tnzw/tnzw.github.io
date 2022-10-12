@@ -1,4 +1,4 @@
-#print("USING fs_sync wip.py!!!"); del fs_sync; exec(open("def/wip/fs_sync wip.py","rb").read(), globals(), globals())
+#fs_sync = 'def/wip/fs_sync.yieldable.py'; print(f'--- USING {fs_sync}!!! ---'); exec(open(fs_sync, 'rb').read(), globals(), globals())
 
 fs_sync__use_rsync = 0
 
@@ -117,7 +117,7 @@ def fs_sync__reporttree(*paths, sep="/", top=False, size=False, data=False, mode
   if statconverter is None:
     def statconverter(val, prop):
       if prop == "mode": return oct(val & 0o777)
-      if prop in ("mtime", "atime", "ctime"): return int(val) if val == int(val) else val
+      if prop in ("mtime", "atime", "ctime"): ival = int(val); return ival if val == ival else val
       return val
   def read(path, text=False):
     with _open(path, "r" if text else "rb", **_open_opt) as f: return f.read()
@@ -132,12 +132,12 @@ def fs_sync__reporttree(*paths, sep="/", top=False, size=False, data=False, mode
     assert not stats or stats.st_nlink == 1, stats
     if not noreport:
       if typ in ("", sep):
-        statstr = " ".join(f"{k}={statconverter(getattr(stats, 'st_' + k), k)!r}" for k, t in (("mode", mode), ("mtime", mtime), ("uid", uid), ("gid", gid)) if t)
+        statstr = " ".join(f"{k}={statconverter(getattr(stats, 'st_' + k), k)}" for k, t in (("mode", mode), ("mtime", mtime), ("uid", uid), ("gid", gid)) if t)
         if typ == "":
           if data: statstr = (statstr + " " if statstr else "") + f"data={read(head + tail)!r}"
           if size: statstr = (statstr + " " if statstr else "") + f"size={stats.st_size!r}"
       elif typ == "@":
-        statstr = " ".join(f"{k}={statconverter(getattr(stats, 'st_' + k), k)!r}" for k, t in (("mtime", mtime_for_link),) if t)
+        statstr = " ".join(f"{k}={statconverter(getattr(stats, 'st_' + k), k)}" for k, t in (("mtime", mtime_for_link),) if t)
         if data: statstr = (statstr + " " if statstr else "") + f"target={os_module.readlink(head + tail)!r}"
         if size: statstr = (statstr + " " if statstr else "") + f"size={stats.st_size!r}"
       if typ == " (noent)": report.append(f"{tail}{typ}")
@@ -255,7 +255,15 @@ def fs_sync__assert_report(a, b, message=None, info=None):
 
 @fs_sync__tester
 def test_fs_sync__rsync_no_option():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  cwd = os.getcwd()
+  fs_sync__mktree(grep_notsymlink(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -264,6 +272,7 @@ def test_fs_sync__rsync_no_option():
     src/dirlink@            target='dir'
     #src/outdirlink@         target='../src2'
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{cwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -276,7 +285,7 @@ def test_fs_sync__rsync_no_option():
 
     src/quickcheck          mode=0o646 mtime=1234 data=b'a'
     dst/quickcheck          mode=0o646 mtime=1234 data=b'b'
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1)
 
   if fs_sync__use_rsync: os.system("rsync src/* dst/")
@@ -304,7 +313,15 @@ def test_fs_sync__rsync_ignoretimes():
 
 @fs_sync__tester
 def test_fs_sync__rsync_archive():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  cwd = os.getcwd(); sep = os.sep; rcwd = repr(cwd)[1:-1]; rsep = repr(sep)[1:-1]; rrcwd = '\\\\\\\\?\\\\' + rcwd if os.name == 'nt' else rcwd
+  fs_sync__mktree(grep_notsymlink(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -313,6 +330,7 @@ def test_fs_sync__rsync_archive():
     src/dirlink@            target='dir'
     #src/outdirlink@         target='../src2'
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{rcwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -327,7 +345,7 @@ def test_fs_sync__rsync_archive():
     dst/update_file_diff_mtime mode=0o646 mtime=1002 data=b'u2'
     src/update_file_diff_size  mode=0o646 mtime=1004 data=b'u1'
     dst/update_file_diff_size  mode=0o646 mtime=1004 data=b'u11'
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)
 
   if fs_sync__use_rsync: os.system("rsync src/ dst/ --archive")
@@ -335,42 +353,48 @@ def test_fs_sync__rsync_archive():
 
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
-  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
-    -dst/update_file_diff_mtime mode={file_mode!r} mtime=1002 data=b'u2'
-    -dst/update_file_diff_size  mode={file_mode!r} mtime=1004 data=b'u11'
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), grep_notsymlink(f"""
+    -dst/update_file_diff_mtime mode={file_mode} mtime=1002 data=b'u2'
+    -dst/update_file_diff_size  mode={file_mode} mtime=1004 data=b'u11'
+    +dst/abslink@            target='{rrcwd}{rsep}src{rsep}file'
     +dst/brokenlink@         target='brokenlinktarget'
-    +dst/dir/                mode={dir_mode!r} mtime=2000
+    +dst/dir/                mode={dir_mode} mtime=2000
     +dst/dir/brokenlink2@    target='brokenlink2target'
-    +dst/dir/emptydir2/      mode={dir_mode!r} mtime=1006
+    +dst/dir/emptydir2/      mode={dir_mode} mtime=1006
     +dst/dir/emptydirlink2@  target='emptydir2'
-    +dst/dir/file2           mode={file_mode!r} mtime=1004 data=b'f2'
+    +dst/dir/file2           mode={file_mode} mtime=1004 data=b'f2'
     +dst/dir/filelink2@      target='file2'
     +dst/dir/infinitelink2@  target='../infinitelink'
     +dst/dir/looplink@       target='../dir'
     +dst/dir/parfilelink@    target='../file'
     +dst/dirlink@            target='dir'
-    +dst/emptydir/           mode={dir_mode!r} mtime=1002
+    +dst/emptydir/           mode={dir_mode} mtime=1002
     +dst/emptydirlink@       target='emptydir'
-    +dst/file                mode={file_mode!r} mtime=1000 data=b'f1'
+    +dst/file                mode={file_mode} mtime=1000 data=b'f1'
     +dst/filelink@           target='file'
     +dst/infinitelink@       target='dir/infinitelink'
-    +dst/update_file_diff_mtime mode={file_mode!r} mtime=1000 data=b'u1'
-    +dst/update_file_diff_size  mode={file_mode!r} mtime=1004 data=b'u1'
-  """)
+    +dst/update_file_diff_mtime mode={file_mode} mtime=1000 data=b'u1'
+    +dst/update_file_diff_size  mode={file_mode} mtime=1004 data=b'u1'
+  """))
 
 @fs_sync__tester
 def test_fs_sync__rsync_archive_copylinks():
-  if os.name == "nt": print("can't check it on windows"); return
+  #if os.name == "nt": print("can't check it on windows"); return
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test on this environment!'); return
+  else: supports_symlink = True; os.unlink('lal')
 
-  fs_sync__mktree("""
+  cwd = os.getcwd(); sep = os.sep; rcwd = repr(cwd)[1:-1]; rsep = repr(sep)[1:-1]; rrcwd = '\\\\\\\\?\\\\' + rcwd if os.name == 'nt' else rcwd
+  fs_sync__mktree(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
     src/filelink@           target='file'
     src/emptydirlink@       target='emptydir'
     src/dirlink@            target='dir'
-    #src/outdirlink@         target='../src2'
+    #src/outdirlink@         target='../src2'  # XXX why is this line commented out?
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{rcwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -379,7 +403,7 @@ def test_fs_sync__rsync_archive_copylinks():
     src/dir/emptydirlink2@  target='emptydir2'
     src/dir/parfilelink@    target='../file'
     #src/dir/looplink@       target='../dir'  # rsync has no looplink protection (keeps system behavior)
-    src/dir/infinitelink2@  target='../infinitelink'  # system concider it a brokenlink
+    src/dir/infinitelink2@  target='../infinitelink'  # system conciders it a brokenlink
   """)
   tree_report = fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)
 
@@ -389,27 +413,33 @@ def test_fs_sync__rsync_archive_copylinks():
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
   fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
-    +dst/dir/                    mode={dir_mode!r}  mtime=2000
-    +dst/dir/emptydir2/          mode={dir_mode!r}  mtime=1006
-    +dst/dir/emptydirlink2/      mode={dir_mode!r}  mtime=1006
-    +dst/dir/file2               mode={file_mode!r} mtime=1004 data=b'f2'
-    +dst/dir/filelink2           mode={file_mode!r} mtime=1004 data=b'f2'
-    +dst/dir/parfilelink         mode={file_mode!r} mtime=1000 data=b'f1'
-    +dst/dirlink/                mode={dir_mode!r}  mtime=2000
-    +dst/dirlink/emptydir2/      mode={dir_mode!r}  mtime=1006
-    +dst/dirlink/emptydirlink2/  mode={dir_mode!r}  mtime=1006
-    +dst/dirlink/file2           mode={file_mode!r} mtime=1004 data=b'f2'
-    +dst/dirlink/filelink2       mode={file_mode!r} mtime=1004 data=b'f2'
-    +dst/dirlink/parfilelink     mode={file_mode!r} mtime=1000 data=b'f1'
-    +dst/emptydir/               mode={dir_mode!r}  mtime=1002
-    +dst/emptydirlink/           mode={dir_mode!r}  mtime=1002
-    +dst/file                    mode={file_mode!r} mtime=1000 data=b'f1'
-    +dst/filelink                mode={file_mode!r} mtime=1000 data=b'f1'
+    +dst/abslink                 mode={file_mode} mtime=1000 data=b'f1'
+    +dst/dir/                    mode={dir_mode}  mtime=2000
+    +dst/dir/emptydir2/          mode={dir_mode}  mtime=1006
+    +dst/dir/emptydirlink2/      mode={dir_mode}  mtime=1006
+    +dst/dir/file2               mode={file_mode} mtime=1004 data=b'f2'
+    +dst/dir/filelink2           mode={file_mode} mtime=1004 data=b'f2'
+    +dst/dir/parfilelink         mode={file_mode} mtime=1000 data=b'f1'
+    +dst/dirlink/                mode={dir_mode}  mtime=2000
+    +dst/dirlink/emptydir2/      mode={dir_mode}  mtime=1006
+    +dst/dirlink/emptydirlink2/  mode={dir_mode}  mtime=1006
+    +dst/dirlink/file2           mode={file_mode} mtime=1004 data=b'f2'
+    +dst/dirlink/filelink2       mode={file_mode} mtime=1004 data=b'f2'
+    +dst/dirlink/parfilelink     mode={file_mode} mtime=1000 data=b'f1'
+    +dst/emptydir/               mode={dir_mode}  mtime=1002
+    +dst/emptydirlink/           mode={dir_mode}  mtime=1002
+    +dst/file                    mode={file_mode} mtime=1000 data=b'f1'
+    +dst/filelink                mode={file_mode} mtime=1000 data=b'f1'
   """)
 
 @fs_sync__tester
 def test_fs_sync__rsync_archive_copyunsafelinks():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test on this environment!'); return
+  else: supports_symlink = True; os.unlink('lal')
+
+  cwd = os.getcwd(); sep = os.sep; rcwd = repr(cwd)[1:-1]; rsep = repr(sep)[1:-1]; rrcwd = '\\\\\\\\?\\\\' + rcwd if os.name == 'nt' else rcwd
+  fs_sync__mktree(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -418,6 +448,7 @@ def test_fs_sync__rsync_archive_copyunsafelinks():
     src/dirlink@            target='dir'
     src/outdirlink@         target='../src2'
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{rcwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -433,36 +464,40 @@ def test_fs_sync__rsync_archive_copyunsafelinks():
   tree_report = fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)
 
   if fs_sync__use_rsync: os.system("rsync src/ dst/ --archive --copy-unsafe-links")
-  else: return assert_raise(TypeError, lambda: fs_sync("src", "dst", source_directory=True, archive=True, copy_unsafe_links=True))
+  else: return assert_raise(TypeError, lambda: fs_sync("src", "dst", source_directory=True, archive=True, copy_unsafe_links=True))  # XXX TypeError: fs_sync() got an unexpected keyword argument 'copy_unsafe_links'
 
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
   fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
     +dst/brokenlink@         target='brokenlinktarget'
-    +dst/dir/                mode={dir_mode!r} mtime=2000
+    +dst/dir/                mode={dir_mode} mtime=2000
     +dst/dir/brokenlink2@    target='brokenlink2target'
-    +dst/dir/emptydir2/      mode={dir_mode!r} mtime=1006
+    +dst/dir/emptydir2/      mode={dir_mode} mtime=1006
     +dst/dir/emptydirlink2@  target='emptydir2'
-    +dst/dir/file2           mode={file_mode!r} mtime=1004 data=b'f2'
+    +dst/dir/file2           mode={file_mode} mtime=1004 data=b'f2'
     +dst/dir/filelink2@      target='file2'
     +dst/dir/infinitelink2@  target='../infinitelink'
     +dst/dir/looplink@       target='../dir'
     +dst/dir/parfilelink@    target='../file'
     +dst/dirlink@            target='dir'
-    +dst/emptydir/           mode={dir_mode!r} mtime=1002
+    +dst/emptydir/           mode={dir_mode} mtime=1002
     +dst/emptydirlink@       target='emptydir'
-    +dst/file                mode={file_mode!r} mtime=1000 data=b'f1'
+    +dst/file                mode={file_mode} mtime=1000 data=b'f1'
     +dst/filelink@           target='file'
     +dst/infinitelink@       target='dir/infinitelink'
-    +dst/outdirlink/         mode={dir_mode!r} mtime=19998
-    +dst/outdirlink/file3    mode={file_mode!r} mtime=11000 data=b'f3'
+    +dst/outdirlink/         mode={dir_mode} mtime=19998
+    +dst/outdirlink/file3    mode={file_mode} mtime=11000 data=b'f3'
   """)
 
 @fs_sync__tester
 def test_fs_sync__rsync_dirs_copydirlinks():
-  if os.name == "nt": print("can't check it on windows"); return
+  #if os.name == "nt": print("can't check it on windows"); return
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test on this environment!'); return
+  else: supports_symlink = True; os.unlink('lal')
 
-  fs_sync__mktree("""
+  cwd = os.getcwd(); sep = os.sep; rcwd = repr(cwd)[1:-1]; rsep = repr(sep)[1:-1]; rrcwd = '\\\\\\\\?\\\\' + rcwd if os.name == 'nt' else rcwd
+  fs_sync__mktree(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -471,6 +506,7 @@ def test_fs_sync__rsync_dirs_copydirlinks():
     src/dirlink@            target='dir'
     src/outdirlink@         target='../src2'
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{rcwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -500,7 +536,8 @@ def test_fs_sync__rsync_dirs_copydirlinks():
 def test_fs_sync__rsync_archive_copydirlinks():
   if os.name == "nt": print("can't check it on windows"); return
 
-  fs_sync__mktree("""
+  cwd = os.getcwd(); sep = os.sep; rcwd = repr(cwd)[1:-1]; rsep = repr(sep)[1:-1]; rrcwd = '\\\\\\\\?\\\\' + rcwd if os.name == 'nt' else rcwd
+  fs_sync__mktree(f"""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -509,6 +546,7 @@ def test_fs_sync__rsync_archive_copydirlinks():
     src/dirlink@            target='dir'
     src/outdirlink@         target='../src2'
     src/infinitelink@       target='dir/infinitelink'
+    src/abslink@            target='{rcwd}/src/file'
     src/dir/                mode=0o757 mtime=2000
     src/dir/file2           mode=0o646 mtime=1004 data=b'f2'
     src/dir/emptydir2/      mode=0o757 mtime=1006
@@ -527,26 +565,27 @@ def test_fs_sync__rsync_archive_copydirlinks():
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
   fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
+    +dst/abslink@                target='{rrcwd}/src/file'
     +dst/brokenlink@             target='brokenlinktarget'
-    +dst/dir/                    mode={dir_mode!r}  mtime=2000
+    +dst/dir/                    mode={dir_mode}  mtime=2000
     +dst/dir/brokenlink2@        target='brokenlink2target'
-    +dst/dir/emptydir2/          mode={dir_mode!r}  mtime=1006
-    +dst/dir/emptydirlink2/      mode={dir_mode!r}  mtime=1006
-    +dst/dir/file2               mode={file_mode!r} mtime=1004 data=b'f2'
+    +dst/dir/emptydir2/          mode={dir_mode}  mtime=1006
+    +dst/dir/emptydirlink2/      mode={dir_mode}  mtime=1006
+    +dst/dir/file2               mode={file_mode} mtime=1004 data=b'f2'
     +dst/dir/filelink2@          target='file2'
     +dst/dir/infinitelink2@      target='../infinitelink'
     +dst/dir/parfilelink@        target='../file'
-    +dst/dirlink/                mode={dir_mode!r}  mtime=2000
+    +dst/dirlink/                mode={dir_mode}  mtime=2000
     +dst/dirlink/brokenlink2@    target='brokenlink2target'
-    +dst/dirlink/emptydir2/      mode={dir_mode!r}  mtime=1006
-    +dst/dirlink/emptydirlink2/  mode={dir_mode!r}  mtime=1006
-    +dst/dirlink/file2           mode={file_mode!r} mtime=1004 data=b'f2'
+    +dst/dirlink/emptydir2/      mode={dir_mode}  mtime=1006
+    +dst/dirlink/emptydirlink2/  mode={dir_mode}  mtime=1006
+    +dst/dirlink/file2           mode={file_mode} mtime=1004 data=b'f2'
     +dst/dirlink/filelink2@      target='file2'
     +dst/dirlink/infinitelink2@  target='../infinitelink'
     +dst/dirlink/parfilelink@    target='../file'
-    +dst/emptydir/               mode={dir_mode!r}  mtime=1002
-    +dst/emptydirlink/           mode={dir_mode!r}  mtime=1002
-    +dst/file                    mode={file_mode!r} mtime=1000 data=b'f1'
+    +dst/emptydir/               mode={dir_mode}  mtime=1002
+    +dst/emptydirlink/           mode={dir_mode}  mtime=1002
+    +dst/file                    mode={file_mode} mtime=1000 data=b'f1'
     +dst/filelink@               target='file'
     +dst/infinitelink@           target='dir/infinitelink'
     +dst/outdirlink@             target='../src2'
@@ -554,7 +593,14 @@ def test_fs_sync__rsync_archive_copydirlinks():
 
 @fs_sync__tester
 def test_fs_sync__rsync_archive_ignoreexisting():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  fs_sync__mktree(grep_notsymlink("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -596,7 +642,7 @@ def test_fs_sync__rsync_archive_ignoreexisting():
     dst/dirtoreg            mode=0o666 mtime=11008 data=b'nf3'
     dst/regtodir/           mode=0o777 mtime=12002
     dst/regtodir/gnark2     mode=0o777 mtime=11010
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)
 
   if fs_sync__use_rsync: os.system("rsync src/ dst/ --archive --ignore-existing")
@@ -606,28 +652,35 @@ def test_fs_sync__rsync_archive_ignoreexisting():
   else: dir_mode, file_mode = '0o757', '0o646'
   if fs_sync__use_rsync:
     fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
-      -dst/dir/            mode='0o777' mtime=12000
-      +dst/dir/            mode={dir_mode!r} mtime=2000
-      -dst/dir/emptydir2/  mode='0o777' mtime=11006
-      +dst/dir/emptydir2/  mode={dir_mode!r} mtime=1006
-      -dst/dirtoreg        mode='0o666' mtime=11008 data=b'nf3'
-      -dst/emptydir/       mode='0o777' mtime=11002
-      +dst/dirtoreg        mode='0o666' mtime=2002 data=b'nf3'
-      +dst/emptydir/       mode={dir_mode!r} mtime=1002
+      -dst/dir/            mode=0o777 mtime=12000
+      +dst/dir/            mode={dir_mode} mtime=2000
+      -dst/dir/emptydir2/  mode=0o777 mtime=11006
+      +dst/dir/emptydir2/  mode={dir_mode} mtime=1006
+      -dst/dirtoreg        mode=0o666 mtime=11008 data=b'nf3'
+      -dst/emptydir/       mode=0o777 mtime=11002
+      +dst/dirtoreg        mode=0o666 mtime=2002 data=b'nf3'
+      +dst/emptydir/       mode={dir_mode} mtime=1002
     """)
   else:
     fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
-      -dst/dir/            mode='0o777' mtime=12000
-      +dst/dir/            mode={dir_mode!r} mtime=2000
-      -dst/dir/emptydir2/  mode='0o777' mtime=11006
-      +dst/dir/emptydir2/  mode={dir_mode!r} mtime=1006
-      -dst/emptydir/       mode='0o777' mtime=11002
-      +dst/emptydir/       mode={dir_mode!r} mtime=1002
+      -dst/dir/            mode=0o777 mtime=12000
+      +dst/dir/            mode={dir_mode} mtime=2000
+      -dst/dir/emptydir2/  mode=0o777 mtime=11006
+      +dst/dir/emptydir2/  mode={dir_mode} mtime=1006
+      -dst/emptydir/       mode=0o777 mtime=11002
+      +dst/emptydir/       mode={dir_mode} mtime=1002
     """)
 
 @fs_sync__tester
 def test_fs_sync__rsync_dirs_ignoreexisting():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  fs_sync__mktree(grep_notsymlink("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -667,7 +720,7 @@ def test_fs_sync__rsync_dirs_ignoreexisting():
     dst/dir/infinitelink2@  target='../ninfinitelink'
     dst/dirtoreg            mode=0o666 mtime=11008 data=b'nf3'
     dst/regtodir/           mode=0o777 mtime=11010
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)
 
   if fs_sync__use_rsync: os.system("rsync src/* dst/ --dirs --ignore-existing")
@@ -680,7 +733,14 @@ def test_fs_sync__rsync_dirs_ignoreexisting():
 
 @fs_sync__tester
 def test_fs_sync__rsync_dirs():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  fs_sync__mktree(grep_notsymlink("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -698,7 +758,7 @@ def test_fs_sync__rsync_dirs():
     src/dir/parfilelink@    target='../file'
     src/dir/looplink@       target='../dir'
     src/dir/infinitelink2@  target='../infinitelink'
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1)
 
   if fs_sync__use_rsync: os.system("rsync src/* dst/ --dirs")
@@ -712,6 +772,10 @@ def test_fs_sync__rsync_dirs():
 
 @fs_sync__tester
 def test_fs_sync__rsync_links():
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test on this environment!'); return
+  else: supports_symlink = True; os.unlink('lal')
+
   fs_sync__mktree("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
@@ -747,7 +811,14 @@ def test_fs_sync__rsync_links():
 
 @fs_sync__tester
 def test_fs_sync__remove():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  fs_sync__mktree(grep_notsymlink("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -765,11 +836,11 @@ def test_fs_sync__remove():
     src/dir/parfilelink@    target='../file'
     src/dir/looplink@       target='../dir'
     src/dir/infinitelink2@  target='../infinitelink'
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1)
   if fs_sync__use_rsync: print("  unhandled test for rsync"); return
   else: fs_sync.remove("src/dir", recursive=1, links=1)
-  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), f"""
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), grep_notsymlink(f"""
     -src/dir/
     -src/dir/brokenlink2@ target='brokenlink2target'
     -src/dir/emptydir2/
@@ -779,9 +850,9 @@ def test_fs_sync__remove():
     -src/dir/infinitelink2@ target='../infinitelink'
     -src/dir/looplink@ target='../dir'
     -src/dir/parfilelink@ target='../file'
-  """)
+  """))
   fs_sync.remove("src", source_directory=1, links=1)
-  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), f"""
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), grep_notsymlink(f"""
     -src/brokenlink@ target='brokenlinktarget'
     -src/dir/
     -src/dir/brokenlink2@ target='brokenlink2target'
@@ -800,11 +871,18 @@ def test_fs_sync__remove():
     -src/infinitelink@ target='dir/infinitelink'
     -src/outdirlink@ target='../src2'
     +
-  """)
+  """))
 
 @fs_sync__tester
 def test_fs_sync__move():
-  fs_sync__mktree("""
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  fs_sync__mktree(grep_notsymlink("""
     src/file                mode=0o646 mtime=1000 data=b'f1'
     src/emptydir/           mode=0o757 mtime=1002
     src/brokenlink@         target='brokenlinktarget'
@@ -822,11 +900,11 @@ def test_fs_sync__move():
     src/dir/parfilelink@    target='../file'
     src/dir/looplink@       target='../dir'
     src/dir/infinitelink2@  target='../infinitelink'
-  """)
+  """))
   tree_report = fs_sync__reporttree("src", "dst", data=1)
   if fs_sync__use_rsync: print("  unhandled test for rsync"); return
   else: fs_sync.move("src/dir", "dst/dir", links=1)
-  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), f"""
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), grep_notsymlink(f"""
     -src/dir/
     -src/dir/brokenlink2@ target='brokenlink2target'
     -src/dir/emptydir2/
@@ -845,9 +923,9 @@ def test_fs_sync__move():
     +dst/dir/infinitelink2@ target='../infinitelink'
     +dst/dir/looplink@ target='../dir'
     +dst/dir/parfilelink@ target='../file'
-  """)
+  """))
   fs_sync.move("src", "dst", source_directory=1, target_directory=1, recursive=1, links=1)
-  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), f"""
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1)), grep_notsymlink(f"""
     -src/brokenlink@ target='brokenlinktarget'
     -src/dir/
     -src/dir/brokenlink2@ target='brokenlink2target'
@@ -882,7 +960,7 @@ def test_fs_sync__move():
     +dst/filelink@ target='file'
     +dst/infinitelink@ target='dir/infinitelink'
     +dst/outdirlink@ target='../src2'
-  """)
+  """))
 
 @fs_sync__tester
 def test_fs_sync__rsync_copystat():
@@ -899,9 +977,10 @@ def test_fs_sync__rsync_copystat():
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
   fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
-    -dst/file mode='0o666' mtime=3000 data=b'b'
-    +dst/file mode={file_mode!r} mtime=3000 data=b'b'
+    -dst/file mode=0o666 mtime=3000 data=b'b'
+    +dst/file mode={file_mode} mtime=3000 data=b'b'
   """)
+
 
 @fs_sync__tester
 def XXXtest_fs_sync__rsync_XXX():
@@ -968,25 +1047,48 @@ def XXXtest_fs_sync__rsync_XXX():
 def test_fs_sync__1_first_sync_archive(**K):
   K.setdefault("archive", True)
   lstat = fs_sync__soft_lstat
-  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync__mktree("""
+    src/a/                mode=0o777 mtime=99999
+    src/a/b/              mode=0o777 mtime=9999
+    src/a/b/c/            mode=0o777 mtime=999
+    src/a/d               mode=0o666 mtime=10000
+    src/a/b/e             mode=0o666 mtime=1000
+    src/a/b/c/f           mode=0o666 mtime=100
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)
+  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
   def assert_path_does_not_start_with_slash(_, path, *a): assert_notequal(path[:1].replace("\\", "/"), "/")
   fs_sync("src", "dst", verbose=3, onverbose=assert_path_does_not_start_with_slash, **K)
   if K.get("target_directory"):
-    assert_equal(lstat("src/a"      ), lstat("dst/src/a"      ))
-    assert_equal(lstat("src/a"      ), lstat("dst/src/a"      ))
-    assert_equal(lstat("src/a/b"    ), lstat("dst/src/a/b"    ))
-    assert_equal(lstat("src/a/b/c"  ), lstat("dst/src/a/b/c"  ))
-    assert_equal(lstat("src/a/b/c/f"), lstat("dst/src/a/b/c/f"))
-    assert_equal(lstat("src/a/b/e"  ), lstat("dst/src/a/b/e"  ))
-    assert_equal(lstat("src/a/d"    ), lstat("dst/src/a/d"    ))
+    fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst/src', data=1, mode=1, mtime=1)), '''
+      +dst/src/a/ mode=0o777 mtime=99999
+      +dst/src/a/b/ mode=0o777 mtime=9999
+      +dst/src/a/b/c/ mode=0o777 mtime=999
+      +dst/src/a/b/c/f mode=0o666 mtime=100 data=b''
+      +dst/src/a/b/e mode=0o666 mtime=1000 data=b''
+      +dst/src/a/d mode=0o666 mtime=10000 data=b''
+    ''')
+    #assert_equal(lstat("src/a"      ), lstat("dst/src/a"      ))
+    #assert_equal(lstat("src/a/b"    ), lstat("dst/src/a/b"    ))
+    #assert_equal(lstat("src/a/b/c"  ), lstat("dst/src/a/b/c"  ))
+    #assert_equal(lstat("src/a/b/c/f"), lstat("dst/src/a/b/c/f"))
+    #assert_equal(lstat("src/a/b/e"  ), lstat("dst/src/a/b/e"  ))
+    #assert_equal(lstat("src/a/d"    ), lstat("dst/src/a/d"    ))
   else:
-    assert_equal(lstat("src/a"      ), lstat("dst/a"      ))
-    assert_equal(lstat("src/a"      ), lstat("dst/a"      ))
-    assert_equal(lstat("src/a/b"    ), lstat("dst/a/b"    ))
-    assert_equal(lstat("src/a/b/c"  ), lstat("dst/a/b/c"  ))
-    assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
-    assert_equal(lstat("src/a/b/e"  ), lstat("dst/a/b/e"  ))
-    assert_equal(lstat("src/a/d"    ), lstat("dst/a/d"    ))
+    fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)), '''
+      +dst/a/ mode=0o777 mtime=99999
+      +dst/a/b/ mode=0o777 mtime=9999
+      +dst/a/b/c/ mode=0o777 mtime=999
+      +dst/a/b/c/f mode=0o666 mtime=100 data=b''
+      +dst/a/b/e mode=0o666 mtime=1000 data=b''
+      +dst/a/d mode=0o666 mtime=10000 data=b''
+    ''')
+    #assert_equal(lstat("src/a"      ), lstat("dst/a"      ))
+    #assert_equal(lstat("src/a/b"    ), lstat("dst/a/b"    ))
+    #assert_equal(lstat("src/a/b/c"  ), lstat("dst/a/b/c"  ))
+    #assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
+    #assert_equal(lstat("src/a/b/e"  ), lstat("dst/a/b/e"  ))
+    #assert_equal(lstat("src/a/d"    ), lstat("dst/a/d"    ))
   if K.get("backup_dir"):
     assert_equal(lstat("bak/a"  ), None)
     assert_equal(lstat("bak/src"), None)
@@ -1137,7 +1239,15 @@ def test_fs_sync__4_delete_folder_sync_archive_backup_dir_delete(**K):
 
 @fs_sync__tester
 def test_fs_sync__5_move_folder():
-  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync__mktree("""
+    src/a/                mode=0o777 mtime=99999
+    src/a/b/              mode=0o777 mtime=9999
+    src/a/b/c/            mode=0o777 mtime=999
+    src/a/d               mode=0o666 mtime=10000
+    src/a/b/e             mode=0o666 mtime=1000
+    src/a/b/c/f           mode=0o666 mtime=100
+  """)
+  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
   inos = \
     os.lstat("src"        ).st_ino,\
     os.lstat("src/a"      ).st_ino,\
@@ -1160,7 +1270,15 @@ def test_fs_sync__5_move_folder():
 @fs_sync__tester
 def test_fs_sync__6_file_matcher():
   lstat = fs_sync__soft_lstat
-  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync__mktree("""
+    src/a/                mode=0o777 mtime=99999
+    src/a/b/              mode=0o777 mtime=9999
+    src/a/b/c/            mode=0o777 mtime=999
+    src/a/d               mode=0o666 mtime=10000
+    src/a/b/e             mode=0o666 mtime=1000
+    src/a/b/c/f           mode=0o666 mtime=100
+  """)
+  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
   calls = []
   def file_matcher_True(src, dst, src_stats, dst_stats):
     calls.append((src, dst, src_stats, dst_stats))
@@ -1183,7 +1301,15 @@ def test_fs_sync__6_file_matcher():
 @fs_sync__tester
 def test_fs_sync__7_inplace_stress():
   lstat = fs_sync__soft_lstat
-  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync__mktree("""
+    src/a/                mode=0o777 mtime=99999
+    src/a/b/              mode=0o777 mtime=9999
+    src/a/b/c/            mode=0o777 mtime=999
+    src/a/d               mode=0o666 mtime=10000
+    src/a/b/e             mode=0o666 mtime=1000
+    src/a/b/c/f           mode=0o666 mtime=100
+  """)
+  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
   fs_sync.mirror("src", "dst", inplace=True)
   os.utime("dst/a/b/c/f")
   fs_sync.mirror("src", "dst", inplace=False)
@@ -1193,7 +1319,15 @@ def test_fs_sync__7_inplace_stress():
 @fs_sync__tester
 def test_fs_sync__8_copy_function():
   lstat = fs_sync__soft_lstat
-  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+  fs_sync__mktree("""
+    src/a/                mode=0o777 mtime=99999
+    src/a/b/              mode=0o777 mtime=9999
+    src/a/b/c/            mode=0o777 mtime=999
+    src/a/d               mode=0o666 mtime=10000
+    src/a/b/e             mode=0o666 mtime=1000
+    src/a/b/c/f           mode=0o666 mtime=100
+  """)
+  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
   fs_sync.mirror("src", "dst", copy_function=shutil.copyfileobj)
   assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
 
@@ -1325,19 +1459,19 @@ def test_fs_sync__11_backup_maze():
   if os.name == "nt": dir_mode, file_mode = '0o777', '0o666'
   else: dir_mode, file_mode = '0o757', '0o646'
   fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mtime=1, mode=1)), f"""
-    -dst/a mode={file_mode!r} mtime=1004 data=b'aaa'
-    -dst/a~ mode={file_mode!r} mtime=1006 data=b'aaaa'
-    -dst/b~ mode={file_mode!r} mtime=1004 data=b'bbb'
-    -dst/c~ mode={file_mode!r} mtime=1002 data=b'cc'
-    -dst/c~~ mode={file_mode!r} mtime=1004 data=b'ccc'
-    +dst/a mode={file_mode!r} mtime=1000 data=b'a'
-    +dst/a~ mode={file_mode!r} mtime=1002 data=b'aa'
-    +dst/a~~ mode={file_mode!r} mtime=1004 data=b'aaa'
-    +dst/b~ mode={file_mode!r} mtime=1000 data=b'b'
-    +dst/b~~ mode={file_mode!r} mtime=1002 data=b'bb'
-    +dst/b~~~ mode={file_mode!r} mtime=1004 data=b'bbb'
-    +dst/c~ mode={file_mode!r} mtime=1000 data=b'c'
-    +dst/c~~ mode={file_mode!r} mtime=1002 data=b'cc'
+    -dst/a mode={file_mode} mtime=1004 data=b'aaa'
+    -dst/a~ mode={file_mode} mtime=1006 data=b'aaaa'
+    -dst/b~ mode={file_mode} mtime=1004 data=b'bbb'
+    -dst/c~ mode={file_mode} mtime=1002 data=b'cc'
+    -dst/c~~ mode={file_mode} mtime=1004 data=b'ccc'
+    +dst/a mode={file_mode} mtime=1000 data=b'a'
+    +dst/a~ mode={file_mode} mtime=1002 data=b'aa'
+    +dst/a~~ mode={file_mode} mtime=1004 data=b'aaa'
+    +dst/b~ mode={file_mode} mtime=1000 data=b'b'
+    +dst/b~~ mode={file_mode} mtime=1002 data=b'bb'
+    +dst/b~~~ mode={file_mode} mtime=1004 data=b'bbb'
+    +dst/c~ mode={file_mode} mtime=1000 data=b'c'
+    +dst/c~~ mode={file_mode} mtime=1002 data=b'cc'
   """)
 
 
@@ -1367,5 +1501,147 @@ def test_fs_sync__as_func():
 
 #@fs_sync__tester
 #def test_fs_sync__x_remove_source_non_empy_folder():
-#  tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+#  fs_sync__mktree("""
+#    src/a/                mode=0o777 mtime=99999
+#    src/a/b/              mode=0o777 mtime=9999
+#    src/a/b/c/            mode=0o777 mtime=999
+#    src/a/d               mode=0o666 mtime=10000
+#    src/a/b/e             mode=0o666 mtime=1000
+#    src/a/b/c/f           mode=0o666 mtime=100
+#  """)
+#  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
 #  fs_sync("src", "dst", remove_source_dirs=True)  # XXX it currently raising, what's the expected behavior ?
+
+
+@fs_sync__tester
+def test_fs_sync__archive__delete__target_directory():
+  fs_sync__mktree('''
+    src/a                mode=0o646 mtime=1000 data=b'a'
+    # dst/b below should not be removed!
+    dst/b                mode=0o646 mtime=1002 data=b'b'
+  ''')
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+  if fs_sync__use_rsync: os.system('rsync src/a dst/ --archive --delete --vv')
+  else: fs_sync('src/a', 'dst', target_directory=True, archive=True, delete=True)
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), '''
+    +dst/a data=b'a'
+  ''')
+
+
+@fs_sync__tester
+def test_fs_sync__archive__delete__yield_all():
+  try: os.symlink('lol', 'lal')
+  except OSError: print('cannot test symlinks!'); supports_symlink = False
+  else: supports_symlink = True; os.unlink('lal')
+  def grep_notsymlink(s):
+    if supports_symlink: return s
+    return '\n'.join(line for line in s.split('\n') if '@' not in line)
+
+  def assert_same(a, b):  # XXX assert_equal2?
+    def san(sign, v): return sign + repr(v).replace('\n', '\n' + sign)
+    f = True
+    res = []
+    for k, v in diff(a, b):
+      if k == (0, 1): res.append(san(' ', v))
+      elif k == (0,): res.append(san('-', v)); f = False
+      else:           res.append(san('+', v)); f = False
+    assert f, '\n' + '\n'.join(res)
+  tmpfile_re = re.compile(r'^(.*[\\/])?(\.[^\\/.]+[^\\/]*\.)([^\\/.]+)$')
+  def rename_for_test(path):  # XXX add parameter to fs_sync to control tmp file name, instead of using rename_for_test()
+    _ = tmpfile_re.fullmatch(path)
+    if _ is None: return path
+    return _[1] + _[2] + 'TMP'
+  def filter_event(ev):
+    match ev:
+      case ('os_call', 'utime', (path, (atime, mtime)), *kw):
+        return ('os_call', 'utime', (rename_for_test(path), ('>1000000000' if atime > 1000000000 else atime, '>1000000000' if mtime > 1000000000 else mtime)), *kw)
+      case ('os_call', call, (path, *a), *kw):
+        return ('os_call', call, (rename_for_test(path), *a), *kw)
+    return ev
+  uid, gid = 0, 0  # XXX
+
+  fs_sync__mktree(grep_notsymlink(f'''
+    src/create_empty_folder/ mode=0o777 mtime=9999
+    src/create_file mode=0o666 mtime=1000 data=b'a'
+    src/create_symlink@ target=b'a'
+    src/uptodate_empty_folder/ mode=0o777 mtime=9998
+
+    dst/uptodate_empty_folder/ mode=0o777 mtime=9998
+  '''))
+  tree_report = fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)
+  events = [filter_event(_) for _ in fs_sync('src', 'dst', archive=True, delete=True, yield_all=True)]
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)), grep_notsymlink(f'''
+    +dst/create_empty_folder/ mode=0o777 mtime=9999
+    +dst/create_file mode=0o666 mtime=1000 data=b'a'
+    +dst/create_symlink@ target='a'
+  '''))
+  assert_same(
+    events,
+    [
+      # START checking folders src & dst
+      ('node', 'src', 'dst', '', '', 'src', 'dst'),
+      ('os_call', 'lstat', ('src',), {}),
+      ('os_call', 'lstat', ('dst',), {}),
+      ('skip', 'uptodate', 'dst'),
+      ('os_call', 'listdir', ('src',), {}),
+      ('os_call', 'listdir', ('dst',), {}),
+
+        #   START checking folder ./create_empty_folder/
+        ('node', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder', '', '', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder'),
+        ('os_call', 'lstat', (f'src{os.sep}create_empty_folder',), {}),
+        ('os_call', 'lstat', (f'dst{os.sep}create_empty_folder',), {}),
+        ('sync', 'create', f'dst{os.sep}create_empty_folder'),
+        ('os_call', 'mkdir', (f'dst{os.sep}create_empty_folder',), {}),
+        ('os_call', 'listdir', (f'src{os.sep}create_empty_folder',), {}),
+        #('os_call', 'listdir', (f'dst{os.sep}create_empty_folder',), {}),  # no need to list an freshly created dir
+        ('os_call', 'chmod', (f'dst{os.sep}create_empty_folder', 0o777), {}),
+        *(() if os.name == 'nt' else (('os_call', 'chown', (f'dst{os.sep}create_empty_folder', uid, gid), {'follow_symlinks': False}),)),
+        ('os_call', 'utime', (f'dst{os.sep}create_empty_folder', ('>1000000000', 9999.0)), {}),
+        ('after_sync', 'create', f'dst{os.sep}create_empty_folder'),
+        #   END checking folder ./create_empty_folder/
+
+        #   START checking file ./create_file
+        ('node', f'src{os.sep}create_file', f'dst{os.sep}create_file', '', '', f'src{os.sep}create_file', f'dst{os.sep}create_file'),
+        ('os_call', 'lstat', (f'src{os.sep}create_file',), {}),
+        ('os_call', 'lstat', (f'dst{os.sep}create_file',), {}),
+        ('sync', 'create', f'dst{os.sep}create_file'),
+        #('os_call', 'open', (f'src{os.sep}create_file', 'rb'), {}),
+        #('os_call', 'open', (f'dst{os.sep}.create_file.TMP', 'wb'), {}),
+        #('os_call', 'read', (fd_src_a, 4096), {}),
+        #('os_call', 'write', (fd_src_b, b'a'), {}),
+        ('os_call', 'chmod', (f'dst{os.sep}.create_file.TMP', 0o666), {}),
+        *(() if os.name == 'nt' else (('os_call', 'chown', (f'dst{os.sep}.create_file.TMP', uid, gid), {'follow_symlinks': False}),)),
+        ('os_call', 'utime', (f'dst{os.sep}.create_file.TMP', ('>1000000000', 1000.0)), {}),
+        ('os_call', 'replace', (f'dst{os.sep}.create_file.TMP', f'dst{os.sep}create_file'), {}),
+        ('after_sync', 'create', f'dst{os.sep}create_file'),
+        #   END checking file ./create_file
+
+        #   START checking file ./create_symlink@
+        *((
+          ('node', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink', '', '', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink'),
+          ('os_call', 'lstat', (f'src{os.sep}create_symlink',), {}),
+          ('os_call', 'lstat', (f'dst{os.sep}create_symlink',), {}),
+          ('sync', 'create', f'dst{os.sep}create_symlink'),
+          ('os_call', 'readlink', (f'src{os.sep}create_symlink',), {}),
+          ('os_call', 'symlink', ('a', f'dst{os.sep}create_symlink',), {}),
+          ('after_sync', 'create', f'dst{os.sep}create_symlink'),
+        ) if supports_symlink else ()),
+        #   END checking file ./create_symlink@
+
+        #   START checking folder ./uptodate_empty_folder/
+        ('node', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder', '', '', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder'),
+        ('os_call', 'lstat', (f'src{os.sep}uptodate_empty_folder',), {}),
+        ('os_call', 'lstat', (f'dst{os.sep}uptodate_empty_folder',), {}),
+        ('skip', 'uptodate', f'dst{os.sep}uptodate_empty_folder'),
+        ('os_call', 'listdir', (f'src{os.sep}uptodate_empty_folder',), {}),
+        ('os_call', 'listdir', (f'dst{os.sep}uptodate_empty_folder',), {}),
+        #('os_call', 'chmod', (f'dst{os.sep}uptodate_empty_folder', 0o777), {}),  # same mode between {src,dst}/uptodate_empty_folder
+        ('os_call', 'utime', (f'dst{os.sep}uptodate_empty_folder', ('>1000000000', 9998.0)), {}),
+        ('after_skip', 'uptodate', f'dst{os.sep}uptodate_empty_folder'),
+        #   END checking folder ./uptodate_empty_folder/
+
+      #('os_call', 'chmod', ('dst', 0o777), {}),  # previous lstat(dst) knows that the dst mode does not need to be updated as it is already equal to src mode
+      ('os_call', 'utime', ('dst', ('>1000000000', '>1000000000')), {}),
+      ('after_skip', 'uptodate', 'dst'),
+      # END checking folders src & dst
+    ])

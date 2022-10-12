@@ -1,132 +1,14 @@
-def test_blob__arrayview():
-  arrayview = blob.arrayview
-
-  # repr
-  a = arrayview(b"01234567"); assert_equal(repr(a[:]), "arrayview(b'01234567', slice(0, 8, 1))")
-  a = arrayview(bytearray(b"01234567")); assert_equal(repr(a), "arrayview(bytearray(b'01234567'), slice(0, 8, 1))")
-  a = arrayview(bytearray(b"01234567")); assert_equal(repr(a[:]), "arrayview(bytearray(b'01234567'), slice(0, 8, 1))")
-  a = arrayview("01234567"); assert_equal(repr(a[:]), "arrayview('01234567', slice(0, 8, 1))")
-
-  # __iter__
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(_ for _ in a), b"01234567")
-  a = arrayview(bytearray(b"01234567"), slice(1, -1)); assert_equal(bytes(_ for _ in a), b"01234567"[1:-1])
-
-  # __getitem__ index
-  assert_equal(arrayview(bytearray(b"01234567"))[0], 0x30)
-  assert_equal(arrayview(bytearray(b"01234567"))[7], 0x37)
-  assert_equal(arrayview(bytearray(b"01234567"))[-8], 0x30)
-  assert_equal(bytes(arrayview(bytearray(b"01234567"))[1:-1][1:-1]), b"01234567"[1:-1][1:-1])
-  assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"))[8])
-  assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"))[-9])
-  #assert_equal(b"01234567"[arrayview(bytearray(b"01234567"))._trans_key(slice( 0, None, -1), error=True).start], 0x30)
-  #assert_equal(b"01234567"[arrayview(bytearray(b"01234567"))._trans_key(slice( 7,    6, -1), error=True).start], 0x37)
-  #assert_equal(b"01234567"[arrayview(bytearray(b"01234567"))._trans_key(slice(-8,   -9, -1), error=True).start], 0x30)
-  #assert_raise(IndexError, lambda: b"01234567"[arrayview(bytearray(b"01234567"))._trans_key(slice( 8,   7, -1), error=True).start])
-  #assert_raise(IndexError, lambda: b"01234567"[arrayview(bytearray(b"01234567"))._trans_key(slice(-9, -10, -1), error=True).start])
-  assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"), slice(1, 3, 1))[2])
-  assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"), slice(2, 0, -1))[2])
-  #assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"), slice(1, 3, 1))._trans_key(slice(2, 1, -1), error=True))
-  #assert_raise(IndexError, lambda: arrayview(bytearray(b"01234567"), slice(3, 1, -1))._trans_key(slice(2, 1, -1), error=True))
-
-  # __getitem__ slice
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[:]      ), b"01234567"[:]      )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[1:]     ), b"01234567"[1:]     )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[1:-1]   ), b"01234567"[1:-1]   )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[::2]    ), b"01234567"[::2]    )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[1::2]   ), b"01234567"[1::2]   )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[1:-1:2] ), b"01234567"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[::-1]   ), b"01234567"[::-1]   )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[-2::-1] ), b"01234567"[-2::-1] )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[-2:0:-1]), b"01234567"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[::-2]   ), b"01234567"[::-2]   )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[-2::-2] ), b"01234567"[-2::-2] )
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[-2:0:-2]), b"01234567"[-2:0:-2])
-  a = arrayview(bytearray(b"01234567")); assert_equal(bytes(a[-10:10] ), b"01234567"[-10:10] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[:]      ), b"0246"[:]      )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[1:]     ), b"0246"[1:]     )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[1:-1]   ), b"0246"[1:-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[::2]    ), b"0246"[::2]    )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[1::2]   ), b"0246"[1::2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[1:-1:2] ), b"0246"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[::-1]   ), b"0246"[::-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[-2::-1] ), b"0246"[-2::-1] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[-2:0:-1]), b"0246"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[::-2]   ), b"0246"[::-2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[-2::-2] ), b"0246"[-2::-2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, 2)); assert_equal(bytes(a[-2:0:-2]), b"0246"[-2:0:-2])
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[:]      ), b"135"[:]      )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[1:]     ), b"135"[1:]     )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[1:-1]   ), b"135"[1:-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[::2]    ), b"135"[::2]    )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[1::2]   ), b"135"[1::2]   )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[1:-1:2] ), b"135"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[::-1]   ), b"135"[::-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[-2::-1] ), b"135"[-2::-1] )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[-2:0:-1]), b"135"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[::-2]   ), b"135"[::-2]   )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[-2::-2] ), b"135"[-2::-2] )
-  a = arrayview(bytearray(b"01234567"), slice(1, -2, 2)); assert_equal(bytes(a[-2:0:-2]), b"135"[-2:0:-2])
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[:]      ), b"76543210"[:]      )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[1:]     ), b"76543210"[1:]     )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[1:-1]   ), b"76543210"[1:-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[::2]    ), b"76543210"[::2]    )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[1::2]   ), b"76543210"[1::2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[1:-1:2] ), b"76543210"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[::-1]   ), b"76543210"[::-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[-2::-1] ), b"76543210"[-2::-1] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[-2:0:-1]), b"76543210"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[::-2]   ), b"76543210"[::-2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[-2::-2] ), b"76543210"[-2::-2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -1)); assert_equal(bytes(a[-2:0:-2]), b"76543210"[-2:0:-2])
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[:]      ), b"7531"[:]      )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[1:]     ), b"7531"[1:]     )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[1:-1]   ), b"7531"[1:-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[::2]    ), b"7531"[::2]    )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[1::2]   ), b"7531"[1::2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[1:-1:2] ), b"7531"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[::-1]   ), b"7531"[::-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[-2::-1] ), b"7531"[-2::-1] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[-2:0:-1]), b"7531"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[::-2]   ), b"7531"[::-2]   )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[-2::-2] ), b"7531"[-2::-2] )
-  a = arrayview(bytearray(b"01234567"), slice(None, None, -2)); assert_equal(bytes(a[-2:0:-2]), b"7531"[-2:0:-2])
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[:]      ), b"642"[:]      )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[1:]     ), b"642"[1:]     )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[1:-1]   ), b"642"[1:-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[::2]    ), b"642"[::2]    )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[1::2]   ), b"642"[1::2]   )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[1:-1:2] ), b"642"[1:-1:2] )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[::-1]   ), b"642"[::-1]   )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[-2::-1] ), b"642"[-2::-1] )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[-2:0:-1]), b"642"[-2:0:-1])
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[::-2]   ), b"642"[::-2]   )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[-2::-2] ), b"642"[-2::-2] )
-  a = arrayview(bytearray(b"01234567"), slice(-2, 1, -2)); assert_equal(bytes(a[-2:0:-2]), b"642"[-2:0:-2])
-
-def test_blob__arrayview__setitem():
-  arrayview = blob.arrayview
-  def setitem(o, k, v): o[k] = v
-  a = arrayview(bytearray(b"01234567"))
-  assert_raise(ValueError, lambda: setitem(a, slice(None), b"89"))
-  assert_equal(bytes(a), b"01234567")
-  assert_raise(ValueError, lambda: setitem(a, slice(None), b"987654321"))
-  assert_equal(bytes(a), b"01234567")
-  assert_raise(ValueError, lambda: setitem(a, slice(0, 9), b"987654321"))
-  assert_equal(bytes(a), b"01234567")
-  a[:] = b"98765432"
-  assert_equal(bytes(a), b"98765432")
-
 def test_blob():
 
   # repr
-  assert_equal(repr(blob(([108, 111, 108],))), "blob([arrayview([108, 111, 108], slice(0, 3, 1))])")
-  assert_equal(repr(blob((b"lol",))), "blob([arrayview(b'lol', slice(0, 3, 1))])")
-  assert_equal(repr(blob((b"lol",), type="epyt")), "blob([arrayview(b'lol', slice(0, 3, 1))], type='epyt')")
+  assert_equal(repr(blob(([108, 111, 108],))), "blob([arrayview([108, 111, 108], slice(0, None, 1))])")
+  assert_equal(repr(blob((b"lol",))), "blob([arrayview(b'lol', slice(0, None, 1))])")
+  assert_equal(repr(blob((b"lol",), type="epyt")), "blob([arrayview(b'lol', slice(0, None, 1))], type='epyt')")
 
   # size
   assert_equal(len(blob((b"lol",))), 3)
   assert_equal(len(blob((b"lol",b"blue"))), 7)
-  assert_equal(len(blob((blob.arrayview(b"lol"),b"blue"))), 7)
+  assert_equal(len(blob((arrayview(b"lol"),b"blue"))), 7)
   assert_equal(len(blob((blob((b"lol",)),b"blue"))), 7)
 
   # bytes
@@ -227,11 +109,10 @@ def test_blob():
   #assert_equal(len(blob((b"abc",b"def",b"ghi")).detached()._chunks), 1)
 
 def test_blob__readonly():
-  roblob = blob.readonly
-  def assign(o, k, v): o[k] = v
   def assign(o, k, v): o[k] = v
 
-  b = roblob((bytearray(b"lol"),));
+  b = blob((bytearray(b"lol"),), readonly=2)
+  assert_equal(b.readonly, True)
   assert_equal(bytes(b), b"lol")
   assert_raise(TypeError, lambda: assign(b, 1, 2))
   assert_raise(TypeError, lambda: assign(b, slice(1, 3), b"34"))

@@ -1,7 +1,7 @@
 this.memoryStorage = (function script() {
   "use strict";
 
-  /*! TcTextarea.js Version 1.0.0
+  /*! memoryStorage.js Version 1.0.0
 
       Copyright (c) 2019 Tristan Cavelier <t.cavelier@free.fr>
       This program is free software. It comes without any warranty, to
