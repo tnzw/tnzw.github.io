@@ -1,0 +1,78 @@
+        //XXXctlFormatBlock(f){if(this.contentEditable!='true')return;var c,e=this.getTopCursorNode();if((c=e.childNodes[0])&&c===e.childNodes[e.childNodes.length-1]&&c.tagName==='P')return;this.cmd('formatBlock',f);this.selectNode(e);this.cmd('insertHTML',e.outerHTML.replace(/(^<([a-z:]+)|</([a-z:]+)>$)/g, "$2$3"))},
+
+        getTopCursorNode(e){var l=null;for(e of this.iterParentElements(e||this.getCursorNode(),1)){if(e===this)return l;l=e}},//XXX
+
+        *iterSelectionBlocks(){var n;for(n of this.iterSelectionNodes())if(n.nodeType===n.TEXT_NODE)for(n of this.iterParentElements(n)){if(n.contentEditable=='true')break;if(/^(div|h[0-9]+|p|pre)$/i.test(n.tagName)){yield n;break}}} // XXX
+
+,selectNodes(els){var e,s,r;s=window.getSelection();s.removeAllRanges();for(e of els){r=document.createRange();r.selectNode(e);s.addRange(r)}}
+,selectNode2(el1,el2){var s,r=document.createRange();r.selectNodeContents(el2);r.collapse(false);r.setStart(el1,0);s=window.getSelection();s.removeAllRanges();s.addRange(r)}
+,getSelectedOuterNodes(){
+  var snn=Array.from(this.iterSelectionNodes()),i;
+  while(snn.length>1&&snn[0].parentNode===snn[1])snn.shift();
+  for(i=0;i<snn.length-1;)if(snn[i].nextSibling!==snn[i+1])snn.splice(i+1,1);else ++i;
+  return snn;
+}
+,getSelectedCursorBlocksOld(){
+  var snn=Array.from(this.iterSelectionNodes()),tnn=[],pnn=[],sn,tn,pn,snl,tnl;
+  for(sn of snn)if(sn.type===sn.TEXT_NODE)tnn.push(sn);
+  tnl=tnn.length;
+  snl=snn.length;
+  if(tnl){
+    if(tnn[0]!==snn[0])tnn.unshift(snn[0]);
+    if(tnn[tnl-1]!==snn[snl-1])tnn.push(snl-1);
+  }else if(snl){
+    tnn.push(snn[0]);
+    if(snl>1)tnn.push(snn[snl-1]);
+  }
+  for(tn of tnn)
+    for(pn of this.iterParentElements(tn,1)){
+      if(pn===this) break;
+      if(/^(div|h[0-9]+|p|pre)$/i.test(pn.tagName)){
+        pnn.push(pn);
+        break;
+      }
+    }
+  return pnn;
+}
+,getSelectedCursorBlocks1(){
+  var snn=Array.from(this.iterSelectionNodes()),tnn=[],pnn=[],sn,tn,pn;
+  for(sn of snn)if(sn.type===sn.TEXT_NODE)tnn.push(sn);
+  for(tn of tnn)
+    for(pn of this.iterParentElements(tn,1)){
+      if(pn===this) break;
+      if(/^(div|h[0-9]+|p|pre)$/i.test(pn.tagName)){
+        pnn.push(pn);
+        break;
+      }
+    }
+  return pnn;
+}
+,ctlFormatBlock(sep){  //XXX
+  if(this.contentEditable!='true')return;
+  var bb=Array.from(this.iterSelectionBlocks()),
+      onn=this.getSelectedOuterNodes(),
+      on,n,s,r="",_;
+  for(on of onn){
+    _=on.outerHTML.replace(/<\/\s*[a-z:]\s*>$/,"");
+    r+=_.slice(0,_.length-on.innerHTML.length);
+    for(s of this.iterproperty('nextSibling',on,1)){
+      for(n of this.iterproperty('firstChild',s,1)){
+        if(bb.indexOf(n)!==-1){}
+      }
+    }
+    r+='</'+on.tagName.toLowerCase()+'>';
+  }
+  return;
+
+
+
+
+
+  for(let b of this.getSelectedCursorBlocks()){
+    this.selectNode(b);
+    this.cmd('insertHTML', b.outerHTML.replace(/^<\s*[a-z:]+/i, '<'+sep).replace(/<\/\s*[a-z:]+\s*>$/i, '</'+sep+'>'));
+  }
+}
+
+
+    getHeadHtml(){return document.head.outerHTML.replace(/<link\s[^>]*rel="?manifest(?:"|\s)[^>]*>/ig,'')},

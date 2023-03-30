@@ -1,25 +1,22 @@
-const cacheKey = 'installableapp-v2';
+const cacheKey = 'page-2.5.0';
 
 const contentToCache = [
-  './',
-  './index.html',
+  './page.html',
   './favicon.ico',
-  './icons/icon-32.png',
-  './icons/icon-64.png',
-  './icons/icon-96.png',
-  './icons/icon-128.png',
-  './icons/icon-168.png',
-  './icons/icon-192.png',
-  './icons/icon-256.png',
-  './icons/icon-512.png',
-  './icons/og_image-512.png',
+  './favicon-32.png',
+  './favicon-64.png',
+  './favicon-96.png',
+  './favicon-128.png',
+  './favicon-168.png',
+  './favicon-192.png',
+  './favicon-256.png',
+  './favicon-512.png',
 ];
 
-//console = {log:()=>{}};  // disable logging
+console = {log:()=>{}};  // disable logging
 
 self.addEventListener('install', (e) => {
   // Installing Service Worker
-  // Required for Installable App.
   console.log('[Service Worker] Install');
   e.waitUntil((async () => {
     const cache = await caches.open(cacheKey);
@@ -30,27 +27,31 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('fetch', (e) => {
   // Fetching content using Service Worker
-  // Required for Installable App.
-
-  // Cache http and https only, skip unsupported chrome-extension:// and file://...
-  if (!/^https?:/i.test(e.request.url)) return;
 
   e.respondWith((async () => {
     const r = await caches.match(e.request);
-    console.log(`[Service Worker] Fetching resource: ${e.request.url}`);
     if (r) return r;
-    const response = await fetch(e.request);
-    const cache = await caches.open(cacheKey);
-    console.log(`[Service Worker] Caching new resource: ${e.request.url}`);
-    cache.put(e.request, response.clone());
-    return response;
+    return await fetch(e.request);
   })());
+
+  // // Cache http and https only, skip unsupported chrome-extension:// and file://...
+  // if (!/^https?:/i.test(e.request.url)) return;
+
+  // e.respondWith((async () => {
+  //   const r = await caches.match(e.request);
+  //   console.log(`[Service Worker] Fetching resource: ${e.request.url}`);
+  //   if (r) return r;
+  //   const response = await fetch(e.request);
+  //   const cache = await caches.open(cacheKey);
+  //   console.log(`[Service Worker] Caching new resource: ${e.request.url}`);
+  //   cache.put(e.request, response.clone());
+  //   return response;
+  // })());
 
 });
 
 self.addEventListener('activate', (e) => {
   // Activating this version of the Service Worker
-  // Optional for Installable App.
 
   // Using it to clear old Service Worker version cache.
   e.waitUntil(

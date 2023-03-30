@@ -2,9 +2,10 @@
 <html><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1">
+<meta name="theme-color" content="#F0F0F0">
 <!-- Please, do not put any critical values in <head/>, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.4.2
+const banner=`Page.html Version 2.5.0
 Copyright (c) 2019-2023 <tnzw@github.triton.ovh>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -14,7 +15,7 @@ http://www.wtfpl.net/ for more details.`,
   title=(/[^\s]+/).exec(banner)[1],
   version=(/Version (.*)/m).exec(banner)[1],
   license=banner.replace(/^.*\n/,""),
-  fork_me_on="https://github.com/tnzw/tnzw.github.io/blob/master/pwa/page/page.html";
+  link="https://github.com/tnzw/tnzw.github.io/blob/master/pwa/page/page.html";
 
 const preferences=Object.freeze({appshowabout:1,contenteditable:1,spellcheck:1,lang:"",pageformat:"A4",showtaglevels:0,defaultParagraphSeparator:"p"});
 const otherPreferences=Object.freeze({appshowabout:0,contenteditable:0});
@@ -43,7 +44,8 @@ such as your passwords.`),500);
     escapeHTML(text){return `${text}`.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')},
     formatOf(name){return `${name}`.replace(/^..*\./,'').toLowerCase()},
     strSize(size){var sizes=['B','KB','MB','GB','PB'],i=0,l=sizes.length-1;while(i<l&&size>9999){i++;size=(size/1000)|0;}return size+sizes[i]},
-    updateAppSize:function updateAppSize(delay){clearTimeout(updateAppSize._inputtimer);updateAppSize._inputtimer=setTimeout(_=>app.update({appsize:document.head.outerHTML.length+app.editor.innerHTML.length}),delay!==undefined?delay:500)},
+    getHeadHtml(){return document.head.outerHTML.replace(/<!--\s*NON-STANDALONE\s*-->[^]*/,'</head>')},
+    updateAppSize:function updateAppSize(delay){clearTimeout(updateAppSize._inputtimer);updateAppSize._inputtimer=setTimeout(_=>app.update({appsize:app.getHeadHtml().length+app.editor.innerHTML.length}),delay!==undefined?delay:500)},
     base64(data){if(typeof data==='string')data=new TextEncoder().encode(data);else data=new Uint8Array(data);let bs='';for(let b of data)bs+=String.fromCharCode(b);return btoa(bs)},
     unbase64(data){if(ArrayBuffer.isView(data))data=new TextDecoder().decode(new Uint8Array(data));else data=`${data}`;let bs=atob(data);data=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)data[i]=bs.charCodeAt(i);return data},
     openFile(opt,fn){var f=this.fileElement;opt=opt||0;f[(opt.multiple?'set':'remove')+'Attribute']('multiple','multiple');if(this.hasNwJs)f[(this.state.filepath?'set':'remove')+'Attribute']('nwworkingdir',require('path').dirname(this.state.filepath));f[(opt.nwsaveas?'set':'remove')+'Attribute']('nwsaveas',this.state.filename);f.onchange=fn;f.click()},
@@ -80,9 +82,9 @@ such as your passwords.`),500);
       else
         data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"><title>'+(this.hasNwJs?require('path').basename(as):as)+'</title></head><body>'+this.editor.innerHTML+'</body></html>';
       }else if(this.state.password)
-        data='<!DOCTYPE html>\n<html>'+document.head.outerHTML+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(otherPreferences))+');document.body.querySelector(\'[autofocus]\').focus()}catch(_){}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
+        data='<!DOCTYPE html>\n<html>'+app.getHeadHtml()+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(otherPreferences))+');document.body.querySelector(\'[autofocus]\').focus()}catch(_){}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
       else
-        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'>'+document.head.outerHTML+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))+')}catch(_){}">'+this.editor.innerHTML+'</body></html>';
+        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'>'+app.getHeadHtml()+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))+')}catch(_){}">'+this.editor.innerHTML+'</body></html>';
       document.title=oldtitle;
       if(this.hasNwJs){
         require('fs').writeFileSync(as,data);alert('Saved.');
@@ -169,7 +171,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
       div({style:"background-color:#fff;align-self:center;border:1px solid #000;padding:1em"},[
         dce("p",[dce("b",{onappupdate:"let u=event.updates;if('title' in u)this.textContent=u.title"},"Page.html")," ",dce("sub",{onappupdate:"let u=event.updates;if('version' in u)this.textContent=u.version"},"-.-.-")]),
         dce("p",{onappupdate:"let u=event.updates;if('license' in u)this.innerHTML=event.target.escapeHTML(u.license).replace(/\\n/g,'<br>')"},"LICENSE"),
-        dce("p",["Please, find the latest version here: ",dce("a",{href:fork_me_on,target:"_blank",rel:"noopener noreferrer"},"../pwa/page/page.html"),"!"]),
+        dce("p",["Fork me on ",dce("a",{href:link,target:"_blank",rel:"noopener noreferrer"},"github"),"!"]),
         div([button({onappupdate:"if(event.updates.appshowabout)this.focus()",onclick:"app.update({appshowabout:0})",onescape:"(this.offsetParent!==null)&&this.click()"},"Ok")])
       ])
     ]),
@@ -450,6 +452,12 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
   a[download][uploading],body>div[name=app]>div[name=editor] img[uploading]{opacity:0.5}
   iframe{width:100%}
 </style>
-<title>Page.html</title></head><body onload="try{app.update({&quot;appshowabout&quot;:1,&quot;contenteditable&quot;:1,&quot;spellcheck&quot;:1,&quot;lang&quot;:&quot;&quot;,&quot;pageformat&quot;:&quot;A4&quot;,&quot;showtaglevels&quot;:0,&quot;defaultParagraphSeparator&quot;:&quot;p&quot;})}catch(_){}">
+<title>Page.html</title>
+<!-- NON-STANDALONE -->
+<link rel="shortcut icon" href="favicon.ico">
+<meta property="og:image" content="favicon-512.png">
+<link rel="manifest" href="page.webmanifest">
+<script> setTimeout(() => { if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', {scope: './'}); }); </script>
+</head><body onload="try{app.update({&quot;appshowabout&quot;:1,&quot;contenteditable&quot;:1,&quot;spellcheck&quot;:1,&quot;lang&quot;:&quot;&quot;,&quot;pageformat&quot;:&quot;A4&quot;,&quot;showtaglevels&quot;:0,&quot;defaultParagraphSeparator&quot;:&quot;p&quot;})}catch(_){}">
   <p><br></p>
 </body></html>
