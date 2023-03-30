@@ -9,9 +9,12 @@ def MemOs_soft_lstat(p, default=None, as_str=True, props=None):
   except FileNotFoundError: return default
   else: return fs_sync_stat_to_str(s, props=props) if as_str else s
 def MemOs_writefile(memos, path, data):
-  fd = memos.open(path, memos.O_WRONLY | memos.O_CREAT | memos.O_TRUNC)
-  memos.write(fd, data)
-  memos.close(fd)
+  fd = None
+  try:
+    fd = memos.open(path, memos.O_WRONLY | memos.O_CREAT | memos.O_TRUNC)
+    memos.write(fd, data)
+  finally:
+    if fd is not None: memos.close(fd)
 def MemOs_tester(fn):
   def test(*a,**k):
     tmpdir = tempfile.mkdtemp()

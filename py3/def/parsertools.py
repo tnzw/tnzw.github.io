@@ -1,4 +1,4 @@
-# parsertools.py Version 0.2.2
+# parsertools.py Version 0.2.4
 # Copyright (c) 2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -179,8 +179,8 @@ def parsertools():
 
   class Pattern(params):
     __slots__ = ()
-    def __new__(cls, _scan, _parse_value_func, component, group, min_length, max_length, groups=None, groupindex=None, *a, **kw):
-      return params.__new__(cls, *a, _scan=_scan, _parse_value_func=_parse_value_func, component=component, group=bool(group), min_length=min_length, max_length=max_length, groups=0 if groups is None else groups, groupindex=frozenmapping(() if groupindex is None else groupindex), **kw)
+    def __new__(cls, _scan, component, min_length, max_length, groups=None, groupindex=None, *a, **kw):
+      return params.__new__(cls, *a, _scan=_scan, component=component, min_length=min_length, max_length=max_length, groups=0 if groups is None else groups, groupindex=frozenmapping(() if groupindex is None else groupindex), **kw)
     def __repr__(self): return f'compile({self.component!r})'
     def fullmatch(self, string, pos=None, endpos=None):
       m = self.match(string, pos, endpos)
@@ -550,7 +550,7 @@ def parsertools():
         else: component = group(component[k], _simplify_repr=True)
       else:
         component = select(*component.values(), names=component.keys(), group=True, _simplify_repr=True)
-    elif t in (str, bytes): component = match(component, _repr_raw=True)  # XXX use _simplify_repr
+    elif t in (str, bytes): component = match(component, _simplify_repr=True)
     if references is None: references = [None]
     p = component.__pattern__(references)
     return p
@@ -587,7 +587,7 @@ def parsertools():
 
   # XXX component classes:
   # - join (like chain but value is m[0])
-  # - had
+  # - had  (`re.compile('(?<=x*)y')` or `re.compile('(?<=x|)y')` → re.error: look-behind requires fixed-width pattern) (but `re.compile('(?<=x|y)z')` is ok)
   # - had_not
   # - catch_critical (removes `stop` flag XXX find a better name?)
   # - some (like many but default parameter is min_length=0?)
@@ -601,7 +601,7 @@ def parsertools():
       if self._simplify_repr: return 'NOTHING'
       return f'{self.__class__.__name__}()'
     def __pattern__(self, references):
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, 0)
+      return Pattern(self._scan, self, 0, 0)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       return Result(Match(string, pos, endpos, ((pos, pos),), value=string[pos:pos]))
@@ -613,7 +613,7 @@ def parsertools():
       if self._simplify_repr: return 'EOF'
       return f'{self.__class__.__name__}()'
     def __pattern__(self, references):
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, 0)
+      return Pattern(self._scan, self, 0, 0)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       if pos == len(string): return Result(Match(string, pos, endpos, ((pos, pos),), value=string[pos:pos]))
@@ -626,7 +626,7 @@ def parsertools():
       if self._simplify_repr: return 'BOF'
       return f'{self.__class__.__name__}()'
     def __pattern__(self, references):
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, 0)
+      return Pattern(self._scan, self, 0, 0)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       if pos == 0: return Result(Match(string, pos, endpos, ((pos, pos),), value=string[pos:pos]))
@@ -641,7 +641,7 @@ def parsertools():
       if self._simplify_repr: return 'ONE'
       return f'{self.__class__.__name__}()'
     def __pattern__(self, references):
-      return Pattern(self._scan, None and XXX, self, False and XXX, 1, 1)
+      return Pattern(self._scan, self, 1, 1)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       pos2 = pos + 1
@@ -659,7 +659,7 @@ def parsertools():
     def __pattern__(self, references):
       s = self.set
       #if not isinstance(s, (str, bytes, tuple)): s = tuple(s)
-      return Pattern(self._scan, None and XXX, self, False and XXX, 1, 1, set=s)
+      return Pattern(self._scan, self, 1, 1, set=s)
     @staticmethod
     def _scan(pat, string, pos, endpos, top_match):
       s = pat.set
@@ -673,7 +673,7 @@ def parsertools():
     def __pattern__(self, references):
       s = self.set
       #if not isinstance(s, (str, bytes, tuple)): s = tuple(s)
-      return Pattern(self._scan, None and XXX, self, False and XXX, 1, 1, set=s)
+      return Pattern(self._scan, self, 1, 1, set=s)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       s = pat.set
@@ -684,18 +684,18 @@ def parsertools():
   # LEAF COMPONENTS #
 
   class match(Component):
-    def __init__(self, pattern, ignore_case=False, *, _repr_raw=False): self.pattern = pattern; self.ignore_case = ignore_case; self._repr_raw = bool(_repr_raw)
+    def __init__(self, pattern, ignore_case=False, *, _simplify_repr=False): self.pattern = pattern; self.ignore_case = ignore_case; self._simplify_repr = bool(_simplify_repr)
     def __repr__(self):
       #pattern = self.pattern
       #t = type(pattern)
       #if t in (str, bytes): return f'{pattern!r}'
-      if self._repr_raw: return repr(self.pattern)
+      if self._simplify_repr: return repr(self.pattern)
       return f'{self.__class__.__name__}({self.pattern!r})'
     def __pattern__(self, references):
       pattern = self.pattern
       l = len(pattern)
       ignore_case = bool(self.ignore_case)
-      return Pattern(self._scan, None and XXX and self._parse, self, False and XXX, l, l, pattern=pattern, cmp=pattern.lower() if ignore_case else pattern, ignore_case=ignore_case)
+      return Pattern(self._scan, self, l, l, pattern=pattern, cmp=pattern.lower() if ignore_case else pattern, ignore_case=ignore_case)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       cmp = pat.cmp
@@ -729,7 +729,7 @@ def parsertools():
       g = p.groups + 1
       gi = p.groupindex
       if self.named: gi = gi | {self.name: g}
-      p2 = Pattern(self._scan, None and XXX, self, True or XXX, p.min_length, p.max_length, g, gi, sub_pattern=p, namedgroup=bool(self.named), groupname=n)
+      p2 = Pattern(self._scan, self, p.min_length, p.max_length, g, gi, sub_pattern=p, namedgroup=bool(self.named), groupname=n)
       references[l] = (n, p)
       return p2
     @staticmethod
@@ -753,7 +753,7 @@ def parsertools():
       return f'{self.__class__.__name__}({self.comp!r}{edit_func})'
     def __pattern__(self, references):
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, 0, {}, sub_pattern=p, edit_func=self.edit_func)
+      return Pattern(self._scan, self, p.min_length, p.max_length, 0, {}, sub_pattern=p, edit_func=self.edit_func)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern; edit_func = pat.edit_func
@@ -772,13 +772,13 @@ def parsertools():
           except IndexError: pass
           else:
             if p is None: raise ValueError('cannot refer to an open group')  # re.compile('(\\1)')
-            return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, 0, {}, name=n)
+            return Pattern(self._scan, self, p.min_length, p.max_length, 0, {}, name=n)
         raise ValueError(f'invalid group reference {n!r}')  # re.compile('\1')
       if type(n) == str:
         for g, p in references[1:]:
           if g == n:
             if p is None: raise ValueError('cannot refer to an open group')  # re.compile('(?P<name>(?P=name))')
-            return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, 0, {}, name=n)
+            return Pattern(self._scan, self, p.min_length, p.max_length, 0, {}, name=n)
         raise ValueError(f'unknown group name {n!r}')  # re.compile('(?P=name)')
       raise TypeError(f'invalid group name {n!r}')
     @staticmethod
@@ -805,7 +805,7 @@ def parsertools():
       return f'{self.__class__.__name__}({self.comp!r}, {edit_func})'
     def __pattern__(self, references):
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p, edit_func=self.edit_func)
+      return Pattern(self._scan, self, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p, edit_func=self.edit_func)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern; edit_func = pat.edit_func
@@ -826,7 +826,7 @@ def parsertools():
       n = self.name
       if type(n) != str: raise TypeError('name must be str')
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, 0, {}, sub_pattern=p, name=n, edit_func=self.edit_func)
+      return Pattern(self._scan, self, p.min_length, p.max_length, 0, {}, sub_pattern=p, name=n, edit_func=self.edit_func)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -848,7 +848,7 @@ def parsertools():
       em = self.error_msg
       if em is not None and type(em) != str: raise TypeError('error_msg must be str')
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p, error_msg=em)
+      return Pattern(self._scan, self, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p, error_msg=em)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern; em = pat.error_msg
@@ -871,7 +871,7 @@ def parsertools():
       if em is not None and type(em) != str: raise TypeError('error_msg must be str')
       tp = compile(self.try_comp, references)
       cp = compile(self.crit_comp, references)
-      return mix_chain_patterns((tp, cp), self._scan, None and XXX, self, False and XXX, error_msg=em)
+      return mix_chain_patterns((tp, cp), self._scan, self, error_msg=em)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       tp, cp = pat.children; em = pat.error_msg
@@ -889,7 +889,7 @@ def parsertools():
     def __repr__(self): return f'{self.__class__.__name__}({self.comp!r})'
     def __pattern__(self, references):
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, 0, p.groups, p.groupindex, sub_pattern=p)
+      return Pattern(self._scan, self, 0, 0, p.groups, p.groupindex, sub_pattern=p)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -902,7 +902,7 @@ def parsertools():
     def __repr__(self): return f'{self.__class__.__name__}({self.comp!r})'
     def __pattern__(self, references):
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, 0, p.groups, p.groupindex, sub_pattern=p)
+      return Pattern(self._scan, self, 0, 0, p.groups, p.groupindex, sub_pattern=p)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -921,7 +921,7 @@ def parsertools():
     def __repr__(self): return f'{self.__class__.__name__}({self.comp!r})'
     def __pattern__(self, references):
       p = compile(self.comp, references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, 0, p.max_length, p.groups, p.groupindex, sub_pattern=p, has_default=bool(self.has_default), default=self.default)
+      return Pattern(self._scan, self, 0, p.max_length, p.groups, p.groupindex, sub_pattern=p, has_default=bool(self.has_default), default=self.default)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -1005,7 +1005,7 @@ def parsertools():
       return f'{self.__class__.__name__}({", ".join(repr(_) for _ in self.comps)})'
     def __pattern__(self, references):
       pp = (*(compile(_, references) for _ in self.comps),)
-      return mix_chain_patterns(pp, self._scan, None and XXX, self, False and XXX)
+      return mix_chain_patterns(pp, self._scan, self)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       value = []
@@ -1050,7 +1050,7 @@ def parsertools():
       else:
         pp = (*(compile(c, references) for c in self.comps),)
       if len(pp) == 0: raise ValueError('invalid select() state')
-      return mix_select_patterns(pp, self._scan, None and XXX, self, False and XXX, get_index=bool(self.get_index), names=tuple(self.names))
+      return mix_select_patterns(pp, self._scan, self, get_index=bool(self.get_index), names=tuple(self.names))
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       errpos = 0
@@ -1106,8 +1106,8 @@ def parsertools():
       max_length = None if max_repeat is None or sp.max_length is None else sp.max_length * max_repeat
       min_length += tp.min_length
       max_length = None if max_repeat is None or tp.max_length is None else max_length + tp.max_length
-      p = mix_chain_patterns([sp, tp], None, None and XXX, self, False and XXX)  # XXX use mix_patterns()?
-      return Pattern(self._scan, None and XXX, self, False and XXX, min_length, max_length, p.groups, p.groupindex, step_pattern=sp, stop_pattern=tp, min_repeat=min_repeat, max_repeat=max_repeat, lazy=bool(self.lazy))
+      p = mix_chain_patterns([sp, tp], None, self)  # XXX use mix_patterns()?
+      return Pattern(self._scan, self, min_length, max_length, p.groups, p.groupindex, step_pattern=sp, stop_pattern=tp, min_repeat=min_repeat, max_repeat=max_repeat, lazy=bool(self.lazy))
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       sp = pat.step_pattern; tp = pat.stop_pattern; min_repeat = pat.min_repeat; max_repeat = pat.max_repeat; lazy = pat.lazy; value = []
@@ -1191,7 +1191,7 @@ def parsertools():
   #    p = compile(self.comp, references)
   #    min_length = p.min_length * min_repeat
   #    max_length = None if max_repeat is None or p.max_length is None else p.max_length * max_repeat
-  #    return Pattern(self._scan, None and XXX, self, False and XXX, min_length, max_length, p.groups, p.groupindex, sub_pattern=p, min_repeat=min_repeat, max_repeat=max_repeat)
+  #    return Pattern(self._scan, self, min_length, max_length, p.groups, p.groupindex, sub_pattern=p, min_repeat=min_repeat, max_repeat=max_repeat)
   #  @staticmethod
   #  def _scan(pat, string, pos, endpos, ref_matches):
   #    p = pat.sub_pattern; min_repeat = pat.min_repeat; max_repeat = pat.max_repeat
@@ -1241,7 +1241,7 @@ def parsertools():
     def __pattern__(self, references):
       min_repeat = self.min_repeat
       p = compile(until(self.comp, NOTHING, 1 if min_repeat is None else min_repeat, self.max_repeat), references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p)
+      return Pattern(self._scan, self, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -1254,7 +1254,7 @@ def parsertools():
     def __repr__(self): return f'{self.__class__.__name__}({self.comp!r})'
     def __pattern__(self, references):
       p = compile(until(ONE, self.comp, lazy=True), references)
-      return Pattern(self._scan, None and XXX, self, False and XXX, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p)
+      return Pattern(self._scan, self, p.min_length, p.max_length, p.groups, p.groupindex, sub_pattern=p)
     @staticmethod
     def _scan(pat, string, pos, endpos, ref_matches):
       p = pat.sub_pattern
@@ -1312,7 +1312,7 @@ def parsertools():
 
       NON_ASCII_ESCAPE_VALUE = token(
         'non ascii character',
-        one_not_in(enc('0123456789abcdefghijklmopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')),  # alphanum
+        one_not_in(enc('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')),  # alphanum
         lambda m: m[0])  # -> str
         #lambda m: ['escaped_char', m[0]])  # -> list
 

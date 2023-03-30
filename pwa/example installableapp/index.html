@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Installable App Hello World!</title>
+  <!-- https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Installable_PWAs -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:image" content="icons/og_image-512.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#B12A34">  <!-- optional for Installable App: A primary color for the UI, used by operating system. Same as theme_color in the according webmanifest. -->
+  <link rel="manifest" href="installableapp.webmanifest">  <!-- required for Installable App: https://developer.mozilla.org/en-US/docs/Web/Manifest , at least "name" and one "icons" field must be defined. -->
+  <script>
+    setTimeout(() => {  // or use script 'defer' attribute
+
+      //console = {log:()=>{},error:()=>{}};  // disable logging
+
+      // required for Installable App
+      // Registering Service Worker
+      // https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerContainer/register
+      if ("serviceWorker" in navigator) {
+        // Register a service worker hosted at the root of the
+        // site using the default scope.
+        navigator.serviceWorker.register("sw.js", { scope: "./" }).then(
+          (registration) => {
+            console.log("Service worker registration succeeded:", registration);
+          },
+          (error) => {
+            console.error(`Service worker registration failed: ${error}`);
+          }
+        );
+      } else {
+        console.error("Service workers are not supported.");
+      }
+
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <p><a class="logo" href="/">[Logo]</a></p>
+  </header>
+  <main>
+    <h1>Installable App Hello World!</h1>
+    <p class="description">description</p>
+    <section id="content">
+      <article>
+        [img]
+        <h3>source:</h3>
+        <p>Please view source for more information.</p>
+      </article>
+    </section>
+  </main>
+  <footer>
+    <p>&copy; world!</p>
+  </footer>
+</body>
+</html>

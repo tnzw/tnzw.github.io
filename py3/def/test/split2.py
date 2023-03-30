@@ -1,0 +1,10 @@
+def test_split2():
+  assert_equal(split2('a\nb'), ['a', 'b'])
+  assert_equal(split2('a/b'), ['a/b'])
+  assert_raise(ValueError, lambda: split2('a/b', ()))
+  assert_equal(split2('a/b', '/'), ['a', 'b'])
+  assert_equal(split2('a/b\\c', ('/', '\\')), ['a', 'b', 'c'])
+  assert_raise(TypeError, lambda: split2([]))
+  assert_equal(split2(['a', '/', 'b', '\\', 'c'], (['/'], ['\\'])), [['a'], ['b'], ['c']])
+  assert_equal(split2(('a', '/', 'b', '\\', 'c'), (('/',),)), [('a',), ('b', '\\', 'c')])
+  assert_equal(split2(('a', '/', 'b', '\\', 'c'), (('/',), ('\\',))), [('a',), ('b',), ('c',)])

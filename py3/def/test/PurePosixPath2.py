@@ -24,9 +24,9 @@ def PurePosixPath2__compare_attribute(attr):
   for _ in PurePosixPath2__stress_paths():
     p = getattr(PPP(_), attr)
     p2 = getattr(PPP2(_), attr)
-    if attr == 'suffixes':  # suffixes types differs from list to tuple
-      assert_equal(p2, tuple(p), info=_)
-    elif attr == 'parent':
+    #if attr == 'suffixes':  # suffixes types differs from list to tuple
+    #  assert_equal(p2, tuple(p), info=_)
+    if attr == 'parent':
       assert_equal(p2.parts, p.parts, info=(attr, _))
     elif attr == 'parents':
       p2 = [_.parts for _ in p2]
@@ -73,6 +73,7 @@ def test_PurePosixPath2__joinpath(): return PurePosixPath2__compare_frompath_met
 def test_PurePosixPath2__relative_to(): return PurePosixPath2__compare_frompath_method('relative_to')
 def test_PurePosixPath2__is_relative_to(): return PurePosixPath2__compare_frompath_method('is_relative_to')
 #def test_PurePosixPath2__match(): XXX
+#def test_PurePosixPath2__normalize(): XXX
 
 def test_PurePosixPath2__from_parts():
   PPP, PPP2 = pathlib.PurePosixPath, PurePosixPath2

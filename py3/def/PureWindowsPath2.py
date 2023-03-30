@@ -1,5 +1,5 @@
-# PureWindowsPath2.py Version 1.0.0
-# Copyright (c) 2022 <tnzw@github.triton.ovh>
+# PureWindowsPath2.py Version 2.1.0
+# Copyright (c) 2022-2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -9,6 +9,7 @@
 class PureWindowsPath2(tuple):
   '''\
 PureWindowsPath2(*pathsegments, **replacements)
+anchor, *names = PureWindowsPath2(...)
 
 Handles windows paths like pathlib.PureWindowsPath does but with an extended api.
 
@@ -25,14 +26,15 @@ You can convert from any PurePath-like by doing:
     >>> pp = PurePath(…)
     >>> PureWindowsPath2(pp, anchor='C:\\' if pp.is_absolute() else '')
 '''
+
   # https://docs.python.org/3/library/pathlib.html
   # https://docs.python.org/3/reference/datamodel.html
 
-  # (parts, anchor, drive, root, stem, suffix, suffixes, extra)
-  #   parts contains anchor if anchor is not empty
-  #   eg 'C:\\hello\\world' -> ('C:\\', 'hello', 'world')
-  #      '\\hello\\world' -> ('\\', 'hello', 'world')
-  #      'hello\\world' -> ('hello', 'world')
+  # parts contains anchor if anchor is not empty
+  # eg 'C:\\hello\\world' -> ('C:\\', 'hello', 'world')
+  #    '\\hello\\world' -> ('\\', 'hello', 'world')
+  #    'C:hello\\world' -> ('C:', 'hello', 'world')
+  #    'hello\\world' -> ('hello', 'world')
 
   __slots__ = ()
   def __new__(cls, *pathsegments, **replacements):
@@ -133,37 +135,23 @@ You can convert from any PurePath-like by doing:
     #  return (path[:i], path[i:])
     def name_splitext(name):  # returns (stem, suffix)
       # splitext('..a') → ('.', '.a') is legit
-      if isinstance(name, bytes): _dot = b'.'; _ddot = b'..'
-      else:                       _dot =  '.'; _ddot =  '..'
-      if name[-1:] == _dot: return (name, name[:0])  # name_splitext('a.b.') → ('a.b.', '')
-      if name == _ddot: return (name, name[:0])  # name_splitext('..') → ('..', '')
-      i = len(name) - 1
-      while i > 0 and name[i-1:i] != _dot: i -= 1
-      if i > 0 and name[i-1:i] == _dot: i -= 1
-      if i == 0: return (name, name[:0])
-      return (name[:i], name[i:])
+      extsep = b'.' if isinstance(name, bytes) else '.'
+      i = name.rfind(extsep)
+      if 0 < i < len(name) - 1: return name[:i], name[i:]
+      return name, name[:0]
     def name_splitsuffixes(name):
       # unfortunately, pathlib.Pure{Posix,Windows}Path has inconsistent behavior on spliting name parts
       # → PurePosixPath('..a').stem → '.'
       # → PurePosixPath('..a').suffix → '.a'
       # → PurePosixPath('..a').suffixes → [] ???
       # so we use this method only for suffixes, not stem or suffix
-      if not name: return [name]
-      _dot = b'.' if isinstance(name, bytes) else '.'
-      if name[-1:] == _dot: return [name]
-      nameparts = []
-      i = 0; l = len(name)
-      while i < l and name[i:i+1] == _dot: i += 1
-      #l = len(name); i = min(1, l)
-      while i < l and name[i:i+1] != _dot: i += 1
-      nameparts.append(name[:i])
-      last = i
-      while i < l:
-        if              name[i:i+1] == _dot: i += 1
-        while i < l and name[i:i+1] != _dot: i += 1
-        nameparts.append(name[last:i])
-        last = i
-      return nameparts
+      extsep = b'.' if isinstance(name, bytes) else '.'
+      if name[-1:] == extsep: return [name]  # quickest than using endswith
+      name2 = name.lstrip(extsep)
+      split = name2.split(extsep)  # creates a list with the exact amount of cells
+      split[0] = name[:-len(name2)] + split[0]
+      for i in range(1, len(split)): split[i] = extsep + split[i]
+      return split
 
     def check_name(name):  # PurePath().with_name() behavior
       if isinstance(name, bytes): _sep = b'\\'; _altsep = b'/'; _dot = b'.'; _letters = lettersb; _colon = b':'
@@ -218,14 +206,15 @@ You can convert from any PurePath-like by doing:
 
     def parse(pathsegment):
       ex = []
-      if type(pathsegment) == PureWindowsPath2:
+      t = type(pathsegment)
+      if t == PureWindowsPath2:
         return pathsegment.drive, pathsegment.root, list(pathsegment.names)
       elif isinstance(pathsegment, (str, bytes)):
         return from_fspath(pathsegment)
       elif extract_purepath_parts(pathsegment, ex):
         return ex
-      elif hasattr(pathsegment, '__fspath__'):
-        return from_fspath(pathsegment.__fspath__())
+      elif hasattr(t, '__fspath__'):
+        return from_fspath(t.__fspath__(pathsegment))
       else:
         raise ValueError('invalid path')
 
@@ -255,6 +244,10 @@ You can convert from any PurePath-like by doing:
           if isvalidroot(root): names = parts[1:]
           else: drive = None; root = parts[0][:0]; names = parts
         else: drive = root = None; names = []
+      if 'parsed_anchor' in replacements: drive, root = splitdrive(replacements.pop('parsed_anchor'))
+      if 'parsed_drive' in replacements: drive = replacements.pop('parsed_drive')
+      if 'parsed_root' in replacements: root = replacements.pop('parsed_root')
+      if 'parsed_names' in replacements: names = replacements.pop('parsed_names')
       if replacements: final_check_anchor = final_check_names = True
       if 'parts' in replacements: # this is the default PurePath._from_parts behavior, use `names` to be more strict
         parts = [*replacements.pop('parts')]
@@ -308,7 +301,7 @@ You can convert from any PurePath-like by doing:
         if suffix: names[-1] = stem + check_suffix(suffix)
         else: names[-1] = stem
       if replacements:
-        raise TypeError(f'PureWindowsPath2() unhandled keyword parameters: {", ".join(str(_) for _ in replacements)}')
+        raise TypeError(f'{cls.__name__}() unhandled keyword parameters: {", ".join(str(_) for _ in replacements)}')
 
     if root is None: root = names[0][:0] if names else (drive[:0] if drive is not None else '')
     if drive is None: drive = root[:0]
@@ -323,57 +316,112 @@ You can convert from any PurePath-like by doing:
       if not isvalidroot(root): raise ValueError(f'invalid root {root!r}')
     if final_check_names:
       for _ in names: check_name(_)
-    if names:
-      _, *suffixes = name_splitsuffixes(names[-1])
-      stem, suffix = name_splitext(names[-1])
-    else:
-      stem = suffix = root[:0]; suffixes = ()
+    #if names:
+    #  _, *suffixes = name_splitsuffixes(names[-1])
+    #  stem, suffix = name_splitext(names[-1])
+    #else:
+    #  stem = suffix = root[:0]; suffixes = ()
     if anchor: names.insert(0, anchor)
-    po = tuple.__new__(cls, (tuple(names), anchor, drive, root, stem, suffix, tuple(suffixes)))
+    po = tuple.__new__(cls, (*names,))
     po.__fspath__()  # check part types
     return po
-
   @property
-  def drive(self): return tuple.__getitem__(self, 2)
+  def _cparts(self):
+    # in PureWindowsPath, it is a cached property, but here PureWindowsPath2 is frozen/stateless
+    # no transcoding, keeping type of parts (str or bytes)
+    # do not replace anchor separators, do not enable comparison with posix paths (also __hash__ would differ from PureWindowsPath)
+    return [*(_.lower() for _ in self.parts)]
   @property
-  def root(self): return tuple.__getitem__(self, 3)
+  def _parts(self): return [*self.parts]
   @property
-  def anchor(self): return tuple.__getitem__(self, 1)
+  def anchor(self):
+    try: anchor = tuple.__getitem__(self, 0)
+    except IndexError: return ''
+    sep, colon = (b'\\', b':') if isinstance(anchor, bytes) else ('\\', ':')
+    if anchor[-1:] != sep and anchor[1:] != colon: return anchor[:0]
+    return anchor
+  @property
+  def drive(self):
+    try: anchor = tuple.__getitem__(self, 0)
+    except IndexError: return ''
+    sep, colon = (b'\\', b':') if isinstance(anchor, bytes) else ('\\', ':')
+    # anchor could be \\a\\ \\a\b\ C:\ C:
+    if anchor[-1:] == sep: return anchor[:-1]
+    if anchor[1:] != colon: return anchor[:0]
+    return anchor
+  @property
+  def name(self): anchor = self.anchor; names = self.parts[1:] if anchor else self.parts; return names[-1] if names else anchor[:0]
+  @property
+  def parent(self):
+    parts = self.parts
+    i = None if self.anchor and len(parts) == 1 else -1
+    return self.__class__(parsed_parts=parts[:i])
   @property
   def parents(self):  # pathlib.PurePath returns <PurePath.parents> object
     parts = self.parts
     ani = 0 if self.anchor else 1
-    return (*(PureWindowsPath2(parsed_parts=parts[:i]) for i in range(1 - ani, len(parts))),)[::-1]
+    return (*(self.__class__(parsed_parts=parts[:i]) for i in range(1 - ani, len(parts))),)[::-1]
   @property
-  def parent(self):
-    pts = self.parts
-    i = None if self.anchor and len(pts) == 1 else -1
-    return PureWindowsPath2(parsed_parts=pts[:i])
+  def parts(self): return tuple(self)
   @property
-  def parts(self): return tuple.__getitem__(self, 0)
+  def root(self):
+    try: anchor = tuple.__getitem__(self, 0)
+    except IndexError: return ''
+    sep = b'\\' if isinstance(anchor, bytes) else '\\'
+    # anchor could be \\a\\ \\a\b\ C:\ C:
+    if anchor[-1:] == sep: return anchor[-1:]
+    return anchor[:0]
   @property
-  def name(self): return self.names[-1] if self.names else self.root[:0]
+  def stem(self):
+    name = self.name
+    extsep = b'.' if isinstance(name, bytes) else '.'
+    i = name.rfind(extsep)
+    if 0 < i < len(name) - 1: return name[:i]
+    return name
   @property
-  def suffix(self): return tuple.__getitem__(self, 5)
+  def suffix(self):
+    name = self.name
+    extsep = b'.' if isinstance(name, bytes) else '.'
+    i = name.rfind(extsep)
+    if 0 < i < len(name) - 1: return name[i:]
+    return name[:0]
   @property
-  def suffixes(self): return tuple.__getitem__(self, 6)
-  @property
-  def stem(self): return tuple.__getitem__(self, 4)
-  @property
-  def _parts(self): return [*self.parts]  # in PureWindowsPath, it is a cached property, but here PureWindowsPath2 is frozen/stateless
-  @property
-  def _cparts(self): return [*(_.lower() for _ in self.parts)]  # in PureWindowsPath, it is a cached property, but here PureWindowsPath2 is frozen/stateless
+  def suffixes(self):
+    name = self.name
+    extsep = b'.' if isinstance(name, bytes) else '.'
+    if name.endswith(extsep): return []
+    name = name.lstrip(extsep)
+    return [extsep + suffix for suffix in name.split(extsep)[1:]]
+  def __bytes__(self):
+    fspath = self.__fspath__()
+    if isinstance(fspath, bytes): return fspath
+    return fspath.encode('ascii', 'strict')
+  def __fspath__(self): anchor = self.anchor; return anchor + self.sep.join(self.names) or (b'.' if isinstance(anchor, bytes) else '.')
+  def __hash__(self): return (*self._cparts,).__hash__()  # pathlib.PurePath behavior
   def __repr__(self): return f'{self.__class__.__name__}({self.as_posix()!r})'
-  def __fspath__(self): return self.anchor + self.sep.join(self.names) or self.curdir
-  def __hash__(self): return (*self._cparts,).__hash__()  # pathlib.PureWindowsPath behavior
-  #def __eq__(self): use default behavior (not exactly like pathlib.PurePath behavior)
-  #def __ge__(self):
-  #def __gt__(self):
-  #def __le__(self):
-  #def __lt__(self):
-  #def __ne__(self):
-  def __truediv__(self, other): return PureWindowsPath2(self, other)
-  def __rtruediv__(self, other): return PureWindowsPath2(other, self)
+  def __str__(self): return str(self.__fspath__())
+  def __eq__(self, other):
+    try: other_cparts = other._cparts
+    except AttributeError: return False
+    return self._cparts == other_cparts
+  def __ge__(self, other):
+    try: other_cparts = other._cparts
+    except AttributeError: raise TypeError(f"> not supported between instances of {self.__class__.__name__!r} and {other.__class__.__name__!r}")
+    return self._cparts >= other_cparts
+  def __gt__(self, other):
+    try: other_cparts = other._cparts
+    except AttributeError: raise TypeError(f"> not supported between instances of {self.__class__.__name__!r} and {other.__class__.__name__!r}")
+    return self._cparts > other_cparts
+  def __le__(self, other):
+    try: other_cparts = other._cparts
+    except AttributeError: raise TypeError(f"> not supported between instances of {self.__class__.__name__!r} and {other.__class__.__name__!r}")
+    return self._cparts <= other_cparts
+  def __lt__(self, other):
+    try: other_cparts = other._cparts
+    except AttributeError: raise TypeError(f"> not supported between instances of {self.__class__.__name__!r} and {other.__class__.__name__!r}")
+    return self._cparts < other_cparts
+  def __truediv__(self, other): return self.__class__(self, other)
+  def __rtruediv__(self, other): return self.__class__(other, self)
   def as_posix(self): p = self.__fspath__(); return p.replace(b'\\', b'/') if isinstance(p, bytes) else p.replace('\\', '/')  # yes… this is original behavior…
   def as_uri(self):
     p = self.__fspath__()
@@ -383,7 +431,7 @@ You can convert from any PurePath-like by doing:
       if p.startswith(_sep): return _file + p  # if drive is UNC
       return _file + _sep * 3 + p  # if drive is letter
     raise ValueError("relative path can't be expressed as a file URI")
-  def is_absolute(self): return True if self.drive and self.root else False  # if no drive, then not absolute
+  def is_absolute(self): return True if self.root and self.drive else False  # if no drive, then not absolute
   def is_relative_to(self, other): return self.relative_to(other, _bool=True)
   def is_reserved(self):
     name = self.name.lower()
@@ -410,13 +458,13 @@ You can convert from any PurePath-like by doing:
       for _ in reserved2i:
         if name[:3] == _ and name[-1:] in digits: return True
     return False
-  def joinpath(self, *other): return PureWindowsPath2(self, *other)
+  def joinpath(self, *other): return self.__class__(self, *other)
   #XXX def match
   def relative_to(self, other, *, _bool=False):
     def checktypes(a, b):
       ta, tb = type(a), type(b)
       if ta != tb: raise TypeError(f'cannot compare {ta.__name__} with {tb.__name__}')
-    other = PureWindowsPath2(other)
+    other = self.__class__(other)
     srt, ort = self.anchor, other.anchor
     checktypes(srt, ort)
     if srt == ort:
@@ -428,29 +476,47 @@ You can convert from any PurePath-like by doing:
         else: i += 1
       else:
         for _ in ip2: break  # end of self reached, but other still has names, so other is not a subpath of self
-        else: return True if _bool else PureWindowsPath2(root=srt[:0], parsed_parts=p1[i:])  # root=… is to keep fspath type when parsed_parts is empty
+        else: return True if _bool else self.__class__(parsed_root=srt[:0], parsed_parts=p1[i:])  # root=… is to keep fspath type when parsed_parts is empty
     if _bool: return False
-    raise ValueError(f'{self.__fspath__()!r} is not in the subpath of {other.__fspath__()!r} OR one path is relative and the other is absolute.')  # yes, this is the true PurePath error behavior
-  def with_name(self, name): return PureWindowsPath2(self, name=name)
-  def with_stem(self, stem): return PureWindowsPath2(self, stem=stem)
-  def with_suffix(self, suffix): return PureWindowsPath2(self, suffix=suffix)
+    raise ValueError(f'{self} is not in the subpath of {other} OR one path is relative and the other is absolute.')  # yes, this is the true PurePath error behavior
+  def with_name(self, name): return self.__class__(self, name=name)
+  def with_stem(self, stem): return self.__class__(self, stem=stem)
+  def with_suffix(self, suffix): return self.__class__(self, suffix=suffix)
 
   # non PurePath API
   @property
+  def altsep(self): return b'/' if isinstance(self.anchor, bytes) else '/'
+  #@property
+  #def comps(self): anchor = self.anchor; parts = self.parts; return ((b'' if isinstance(anchor, bytes) else '').join(parts[:2]), *parts[2:]) if anchor else parts
+  @property
+  def curdir(self): return b'.' if isinstance(self.anchor, bytes) else '.'
+  @property
+  def extsep(self): return b'.' if isinstance(self.anchor, bytes) else '.'
+  @property
   def names(self): return self.parts[1:] if self.anchor else self.parts
   @property
-  def sep(self): return b'\\' if isinstance(self.root, bytes) else '\\'
+  def pardir(self): return b'..' if isinstance(self.anchor, bytes) else '..'
   @property
-  def altsep(self): return b'/' if isinstance(self.root, bytes) else '/'
-  @property
-  def curdir(self): return b'.' if isinstance(self.root, bytes) else '.'
-  @property
-  def pardir(self): return b'..' if isinstance(self.root, bytes) else '..'
-  @property
-  def extsep(self): return b'.' if isinstance(self.root, bytes) else '.'
+  def sep(self): return b'\\' if isinstance(self.anchor, bytes) else '\\'
   def __add__(self, other):
-    if hasattr(other, '__fspath__'): other = other.__fspath__()
-    return PureWindowsPath2(self.__fspath__() + other)
-  def __floordiv__(self, other): return PureWindowsPath2(anchor=self.anchor, names=[*self.names, other])
-  def __rfloordiv__(self, other): raise ValueError('PureWindowsPath2() cannot append name from tail')
-  def _replace(self, **replacements): return PureWindowsPath2(self, **replacements)
+    t = type(other)
+    if hasattr(t, '__fspath__'): other = t.__fspath__(other)
+    if self.parts: return self.__class__(self.__fspath__() + other)
+    return self.__class__(other)
+  def __floordiv__(self, other): return self.__class__(parsed_anchor=self.anchor, names=[*self.names, other])
+  def __rfloordiv__(self, other): raise ValueError(f"{self.__class__.__name__}() cannot append name from tail")
+  def _replace(self, **replacements): return self.__class__(self, **replacements)
+  def normalize(self):
+    anchor = self.anchor
+    if isinstance(anchor, bytes): curdir = b'.'; pardir = b'..'
+    else:                         curdir =  '.'; pardir =  '..'
+    extra = []; names = []
+    for n in self.names:
+      if not n or n == curdir: pass
+      elif n == pardir:
+        if names: names.pop()
+        else: extra.append(pardir)
+      else: names.append(n)
+    if self.is_absolute(): return self.__class__(parsed_parts=[anchor] + names)  # 'C:/a/../../b' -> 'C:/b', '/a/../../b' -> '/b'
+    if anchor: return self.__class__(parsed_parts=[anchor] + extra + names)  # 'C:a/../../b' -> 'C:../b'
+    return self.__class__(parsed_parts=extra + names)  # 'a/../../b' -> '../b'

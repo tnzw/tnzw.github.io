@@ -1,5 +1,5 @@
-# FileIO.py Version 2.1.1-2
-# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
+# FileIO.py Version 2.1.2
+# Copyright (c) 2020-2022 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -44,8 +44,10 @@ class FileIO(object):
     self._fileno = None
     self._os_module = os_module
     if opener is None: opener = self._os_module.open
-    self.name = name
-    self._closefd = True if closefd else False
+    self.name = name  # could be PathLike, str, bytes or int XXX please check type!
+    # XXX according to original behavior, if name is int, then name is a fileno and so opener() should not be called even if defined!
+    # XXX closefd could be False only if name is a fileno, but is still True by default.
+    self._closefd = True if closefd else False  # XXX should only be used on __del__ method!
     p,a,b,r,t,w,x = io_parsemode(mode)
     flags = 0
     if p: flags |= os_module.O_RDWR
@@ -75,11 +77,13 @@ class FileIO(object):
   _blksize = 4096
   # _dealloc_warn
   # _finalizing
-
+  
+  def __del__(self):
+    if self._closefd: self.close()
   def close(self):
     if self._closed: return
     self.flush()
-    if self._closefd: self._os_module.close(self._fileno)
+    self._os_module.close(self._fileno)
     self._closed = True
   def flush(self):
     # seems that sometimes an fd cannot be synced…

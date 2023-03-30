@@ -24,9 +24,7 @@ def PureWindowsPath2__compare_attribute(attr):
   for _ in PureWindowsPath2__stress_paths():
     p = getattr(PPP(_), attr)
     p2 = getattr(PPP2(_), attr)
-    if attr == 'suffixes':  # suffixes types differs from list to tuple
-      assert_equal(p2, tuple(p), info=_)
-    elif attr == 'parent':
+    if attr == 'parent':
       assert_equal(p2.parts, p.parts, info=(attr, _))
     elif attr == 'parents':
       p2 = [_.parts for _ in p2]
@@ -62,7 +60,7 @@ def test_PureWindowsPath2__parents(): return PureWindowsPath2__compare_attribute
 def test_PureWindowsPath2__name(): return PureWindowsPath2__compare_attribute('name')
 def test_PureWindowsPath2__stem(): return PureWindowsPath2__compare_attribute('stem')
 def test_PureWindowsPath2__suffix(): return PureWindowsPath2__compare_attribute('suffix')
-def test_PureWindowsPath2__suffixes(): return PureWindowsPath2__compare_attribute('suffixes')  # returned types differ (tuple != list)
+def test_PureWindowsPath2__suffixes(): return PureWindowsPath2__compare_attribute('suffixes')
 
 def test_PureWindowsPath2__hash__(): return PureWindowsPath2__compare_method('__hash__')
 def test_PureWindowsPath2__fspath__(): return PureWindowsPath2__compare_method('__fspath__')
@@ -75,6 +73,7 @@ def test_PureWindowsPath2__joinpath(): return PureWindowsPath2__compare_frompath
 def test_PureWindowsPath2__relative_to(): return PureWindowsPath2__compare_frompath_method('relative_to')
 def test_PureWindowsPath2__is_relative_to(): return PureWindowsPath2__compare_frompath_method('is_relative_to')
 #def test_PureWindowsPath2__match(): XXX
+#def test_PureWindowsPath2__normalize(): XXX
 
 def test_PureWindowsPath2__from_parts():
   PPP, PPP2 = pathlib.PureWindowsPath, PureWindowsPath2
