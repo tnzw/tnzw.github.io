@@ -1,6 +1,6 @@
 //self.importScripts('some_data.js');
 
-const cacheKey = 'installableapp-v1';
+const cacheKey = 'installableapp-v2';
 
 const contentToCache = [
   './',

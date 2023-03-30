@@ -44,8 +44,8 @@
       "type": "image/png"
     }
   ],
-  "start_url": "/index.html",
-  "display": "fullscreen",
+  "start_url": "index.html",
+  "display": "standalone",
   "theme_color": "#B12A34",
-  "background_color": "#B12A34"
+  "background_color": "#2A34B1"
 }
