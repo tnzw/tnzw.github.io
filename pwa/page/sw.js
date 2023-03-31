@@ -1,4 +1,5 @@
-const cacheKey = 'page-2.5.0';
+// Version 2.5.1
+const cacheKey = 'page-2.5.1';
 
 const contentToCache = [
   './page.html',

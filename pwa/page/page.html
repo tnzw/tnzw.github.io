@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#F0F0F0">
 <!-- Please, do not put any critical values in <head/>, it's not encrypted. Thanks -->
 <script>
-const banner=`Page.html Version 2.5.0
+const banner=`Page.html Version 2.5.1
 Copyright (c) 2019-2023 <tnzw@github.triton.ovh>
 This program is free software. It comes without any warranty, to
 the extent permitted by applicable law. You can redistribute it
@@ -44,7 +44,7 @@ such as your passwords.`),500);
     escapeHTML(text){return `${text}`.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')},
     formatOf(name){return `${name}`.replace(/^..*\./,'').toLowerCase()},
     strSize(size){var sizes=['B','KB','MB','GB','PB'],i=0,l=sizes.length-1;while(i<l&&size>9999){i++;size=(size/1000)|0;}return size+sizes[i]},
-    getHeadHtml(){return document.head.outerHTML.replace(/<!--\s*NON-STANDALONE\s*-->[^]*/,'</head>')},
+    getHeadHtml(){return document.head.outerHTML.replace(/<!--\s*NON-STANDALONE\s*-->[^]*/,'<'+'/head>')},
     updateAppSize:function updateAppSize(delay){clearTimeout(updateAppSize._inputtimer);updateAppSize._inputtimer=setTimeout(_=>app.update({appsize:app.getHeadHtml().length+app.editor.innerHTML.length}),delay!==undefined?delay:500)},
     base64(data){if(typeof data==='string')data=new TextEncoder().encode(data);else data=new Uint8Array(data);let bs='';for(let b of data)bs+=String.fromCharCode(b);return btoa(bs)},
     unbase64(data){if(ArrayBuffer.isView(data))data=new TextDecoder().decode(new Uint8Array(data));else data=`${data}`;let bs=atob(data);data=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)data[i]=bs.charCodeAt(i);return data},
@@ -78,9 +78,9 @@ such as your passwords.`),500);
       let oldtitle=document.title;document.title='Page.html';
       if(!this.hasNwJs)as=as.replace(/\.html?$/i,'')+'.html';
       if(opt&&opt.export){if(this.state.password)
-        data='<!DOCTYPE html>\n<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"></head><body onload="window.app={update(d){if(d.lang)document.children[0].lang=d.lang;}}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(exportPreferenceKeys.reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
+        data='<!DOCTYPE html>\n<html><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"><'+'/head><body onload="window.app={update(d){if(d.lang)document.children[0].lang=d.lang;}}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(exportPreferenceKeys.reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
       else
-        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"><title>'+(this.hasNwJs?require('path').basename(as):as)+'</title></head><body>'+this.editor.innerHTML+'</body></html>';
+        data='<!DOCTYPE html>\n<html'+(this.state.lang?' lang="'+this.escapeHTML(this.state.lang)+'"':'')+'><head><meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,user-scalable=yes,initial-scale=1"><title>'+(this.hasNwJs?require('path').basename(as):as)+'</title><'+'/head><body>'+this.editor.innerHTML+'</body></html>';
       }else if(this.state.password)
         data='<!DOCTYPE html>\n<html>'+app.getHeadHtml()+'<body onload="try{app.update('+this.escapeHTML(JSON.stringify(otherPreferences))+');document.body.querySelector(\'[autofocus]\').focus()}catch(_){}">'+this.mkDecryptHTML(this.base64(await this.crypto.encrypt(this.editor.innerHTML)),this.base64(await this.crypto.encrypt(JSON.stringify(Object.keys(preferences).reduce((p,k)=>{p[k]=this.state[k]===undefined?null:this.state[k];return p},{})))))+'</body></html>';
       else
@@ -427,10 +427,10 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
 },{passive:true,once:true});
 </script>
 <style>
-  /* A4 padding is 0.5in like in Firefox print default margin */
+  /* A4 padding is 0.5in (1.27cm) like in Firefox print default margin */
   .nodisplay{display:none !important}
-  @media only screen and (min-width:45em){.noscreen,.printonly,.smallwindowonly{display:none !important}}
-  @media only screen and (max-width:45em){.noscreen,.printonly,.largewindowonly{display:none !important}}
+  @media only screen and not (min-width:45em){.noscreen,.printonly,.largewindowonly{display:none !important}}
+  @media only screen and     (min-width:45em){.noscreen,.printonly,.smallwindowonly{display:none !important}}
   @media print{.noprint,.screenonly{display:none !important}body{margin:0}}
   @media only screen{
     body>div[name=app]>div[name=bars]{background-color:rgba(255,255,255,0.7);box-shadow:0px -16px 0px 16px rgba(255,255,255,0.7);border-bottom:1px solid rgba(10, 10, 10, 0.1)}
@@ -441,7 +441,7 @@ onclick="let i=this.parentNode.querySelector('input[type=password]'),v=i.value;P
     body>div[namp=app]>div[name=bars] select{width:2cm}
     body{background-color:#CCC}
     body>div[name=app]>div[name=editor]{background-color:#FFF}
-    body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:0.5in;margin:1em 0 0 0}
+    body>div[name=app]>div[name=editor].pageformat-A4{border:1px rgba(0,0,0,0.26) solid;min-height:29.7cm;box-shadow:0em 0.1em 0.3em 0.02em #000;width:21cm;align-self:center;padding:0.5in;padding:0.5in min((100% - 21cm + 0.5in*2) / 2, 0.5in);margin:1em 0 0 0}
     body>div[name=app]>div[name=editor].pageformat-fullwidth{min-height:10em}
     body>div[name=app]>div[name=editor].showtaglevels * {background-color:rgba(200,200,0,0.1);outline:1px gray dotted;/*box-shadow:inset 0px 0px 1px 2px rgba(185,106,0,0.2)*/}
   }
