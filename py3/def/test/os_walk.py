@@ -39,3 +39,5 @@ def test_os_walk_bytespath_downtop():
   orig_os_walk = [_ for _ in os.walk(b".", topdown=False)]
   cust_os_walk = [_ for _ in os_walk(b".", topdown=False)]
   assert_equal(repr(orig_os_walk), repr(cust_os_walk))
+# XXX test dirnames modification while walking
+# XXX test changing a dir to symlink while walking

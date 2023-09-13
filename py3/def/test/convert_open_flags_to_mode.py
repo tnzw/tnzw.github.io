@@ -44,6 +44,8 @@ def test_convert_open_flags_to_mode_WRONLY_CREAT():
 @convert_open_flags_to_mode_tester
 def test_convert_open_flags_to_mode_WRONLY_CREAT_TRUNC():
   flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+  mode = convert_open_flags_to_mode(flags)
+  assert_equal(mode, "wb")
   fd = os.open("w", flags)
   f = open("wf", convert_open_flags_to_mode(flags))
   try:

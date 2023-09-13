@@ -1,4 +1,4 @@
-def diff_recompile(result, n):
+def diff__recompile(result, n):
   ll = [[] for _ in range(n)]
   for ii, line in result:
     for i in ii:
@@ -9,10 +9,10 @@ def diff__u(a, b):
   s = ""
   for ii, line in diff((str(_) + '\n' for _ in a), (str(_) + '\n' for _ in b)):
     end = "\n\\ No newline at end of file\n" if line[-1] != "\n" else ""
-    if ii == (0, 1): s += f" {line}" + end
-    elif ii == (0,): s += f"-{line}" + end
-    elif ii == (1,): s += f"+{line}" + end
-    else: s += f"?{line}" + end
+    if ii == (0, 1): s += f" {line}{end}"
+    elif ii == (0,): s += f"-{line}{end}"
+    elif ii == (1,): s += f"+{line}{end}"
+    else:            s += f"?{line}{end}"
   return s
 
 def diff__x(*iterables):
@@ -28,7 +28,7 @@ def diff__x(*iterables):
 
 def diff__tester(iterables, is_in=None):
   iterables = [list(_) for _ in iterables]
-  assert_equal(diff_recompile(diff(*iterables), len(iterables)), iterables)
+  assert_equal(diff__recompile(diff(*iterables), len(iterables)), iterables)
   if is_in is not None:
     if len(iterables) == 2: assert_in(diff__u(*iterables), is_in)
     else: assert_in(diff__x(*iterables), is_in)
@@ -80,6 +80,38 @@ def test_diff__1():
  e
 -c
 +g
+""",)
+  )
+
+  diff__tester(
+    (
+      ["a","b","c","d","e","e"],
+      ["A","b","c","e","e"],
+    ),
+    ("""\
+-a
++A
+ b
+ c
+-d
+ e
+ e
+""",)
+  )
+
+  diff__tester(
+    (
+      ["1","x","z","o"],
+      ["2","o","y","o"],
+    ),
+    ("""\
+-1
+-x
+-z
++2
+ o
++y
++o
 """,)
   )
 
@@ -142,4 +174,39 @@ xxxx :g
       ["k"],
       ["a", "c", "e", "g"],
     )
+  )
+
+  diff__tester(
+    (
+      ["a","b","c","d","e","e"],
+      ["A","b","c","e","e"],
+      ["A","b","C","D","e","e"],
+    ),
+    ("""\
+ xx:a
+x  :A
+ b
+ c
+-d
+ e
+ e
+""",)
+  )
+
+  diff__tester(
+    (
+      ["a","b","c","d","e","e"],
+      ["A","b","c","e","e"],
+      ["A","b","c","D","e","e"],
+    ),
+    ("""\
+x  :A
+ xx:a
+   :b
+   :c
+ xx:d
+xx :D
+   :e
+   :e
+""",)
   )

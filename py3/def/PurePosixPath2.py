@@ -1,4 +1,4 @@
-# PurePosixPath2.py Version 2.1.0
+# PurePosixPath2.py Version 2.1.0-2
 # Copyright (c) 2022-2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -259,8 +259,6 @@ You can convert from any PurePath-like by doing:
     try: anchor = tuple.__getitem__(self, 0)
     except IndexError: return ''
     return anchor[:0]
-  @property
-  def name(self): return self.names[-1] if self.names else self.root[:0]
   @property
   def name(self): anchor = self.anchor; names = self.parts[1:] if anchor else self.parts; return names[-1] if names else anchor[:0]
   @property

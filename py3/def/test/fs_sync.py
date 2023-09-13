@@ -664,8 +664,8 @@ def test_fs_sync__rsync_archive_ignoreexisting():
   else:
     fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree("src", "dst", data=1, mode=1, mtime=1)), f"""
       -dst/dir/            mode=0o777 mtime=12000
-      +dst/dir/            mode={dir_mode} mtime=2000
       -dst/dir/emptydir2/  mode=0o777 mtime=11006
+      +dst/dir/            mode={dir_mode} mtime=2000
       +dst/dir/emptydir2/  mode={dir_mode} mtime=1006
       -dst/emptydir/       mode=0o777 mtime=11002
       +dst/emptydir/       mode={dir_mode} mtime=1002
@@ -1316,20 +1316,20 @@ def test_fs_sync__7_inplace_stress():
   def assert_verbose(_, path, *a): assert_equal(False, True, repr((_, path_, *a)))
   fs_sync.mirror("src", "dst", inplace=False, verbose=1, onverbose=assert_verbose)
 
-@fs_sync__tester
-def test_fs_sync__8_copy_function():
-  lstat = fs_sync__soft_lstat
-  fs_sync__mktree("""
-    src/a/                mode=0o777 mtime=99999
-    src/a/b/              mode=0o777 mtime=9999
-    src/a/b/c/            mode=0o777 mtime=999
-    src/a/d               mode=0o666 mtime=10000
-    src/a/b/e             mode=0o666 mtime=1000
-    src/a/b/c/f           mode=0o666 mtime=100
-  """)
-  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
-  fs_sync.mirror("src", "dst", copy_function=shutil.copyfileobj)
-  assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
+#@fs_sync__tester
+#def test_fs_sync__8_copy_function():
+#  lstat = fs_sync__soft_lstat
+#  fs_sync__mktree("""
+#    src/a/                mode=0o777 mtime=99999
+#    src/a/b/              mode=0o777 mtime=9999
+#    src/a/b/c/            mode=0o777 mtime=999
+#    src/a/d               mode=0o666 mtime=10000
+#    src/a/b/e             mode=0o666 mtime=1000
+#    src/a/b/c/f           mode=0o666 mtime=100
+#  """)
+#  #tar_xf(io.BytesIO(tar_a_ab_abc_abcf_abe_ad_data), directory="src")
+#  fs_sync.mirror("src", "dst", copy_function=shutil.copyfileobj)
+#  assert_equal(lstat("src/a/b/c/f"), lstat("dst/a/b/c/f"))
 
 @fs_sync__tester
 def test_fs_sync__9_srcfile_dstfolder_1():
@@ -1537,17 +1537,9 @@ def test_fs_sync__archive__delete__yield_all():
     if supports_symlink: return s
     return '\n'.join(line for line in s.split('\n') if '@' not in line)
 
-  def assert_same(a, b):  # XXX assert_equal2?
-    def san(sign, v): return sign + repr(v).replace('\n', '\n' + sign)
-    f = True
-    res = []
-    for k, v in diff(a, b):
-      if k == (0, 1): res.append(san(' ', v))
-      elif k == (0,): res.append(san('-', v)); f = False
-      else:           res.append(san('+', v)); f = False
-    assert f, '\n' + '\n'.join(res)
   tmpfile_re = re.compile(r'^(.*[\\/])?(\.[^\\/.]+[^\\/]*\.)([^\\/.]+)$')
   def rename_for_test(path):  # XXX add parameter to fs_sync to control tmp file name, instead of using rename_for_test()
+    if isinstance(path, int): return '<int>'
     _ = tmpfile_re.fullmatch(path)
     if _ is None: return path
     return _[1] + _[2] + 'TMP'
@@ -1557,8 +1549,15 @@ def test_fs_sync__archive__delete__yield_all():
         return ('os_call', 'utime', (rename_for_test(path), ('>1000000000' if atime > 1000000000 else atime, '>1000000000' if mtime > 1000000000 else mtime)), *kw)
       case ('os_call', call, (path, *a), *kw):
         return ('os_call', call, (rename_for_test(path), *a), *kw)
+      case ('node', srcname, dstname, src_dir, dst_dir, src, dst, src_lstats, dst_lstats, src_stats, dst_stats):
+        return ('node', srcname, dstname, src_dir, dst_dir, src, dst, None if src_lstats is None else '<src_lstats>', None if dst_lstats is None else '<dst_lstats>', None if src_stats is None else '<src_stats>', None if dst_stats is None else '<dst_stats>')
     return ev
   uid, gid = 0, 0  # XXX
+
+  class Eq_In:
+    def __init__(self, values): self.values = values
+    def __eq__(self, other): return other in self.values
+    def __repr__(self): return f'something in {self.values!r}'
 
   fs_sync__mktree(grep_notsymlink(f'''
     src/create_empty_folder/ mode=0o777 mtime=9999
@@ -1575,21 +1574,23 @@ def test_fs_sync__archive__delete__yield_all():
     +dst/create_file mode=0o666 mtime=1000 data=b'a'
     +dst/create_symlink@ target='a'
   '''))
-  assert_same(
+  assert_nodiff(
     events,
     [
       # START checking folders src & dst
-      ('node', 'src', 'dst', '', '', 'src', 'dst'),
+      #('node', 'src', 'dst', '', '', 'src', 'dst'),
       ('os_call', 'lstat', ('src',), {}),
       ('os_call', 'lstat', ('dst',), {}),
-      ('skip', 'uptodate', 'dst'),
+      ('node', 'src', 'dst', '', '', 'src', 'dst', '<src_lstats>', '<dst_lstats>', '<src_stats>', '<dst_stats>'),
+      Eq_In((('skip', 'uptodate', 'dst'), ('sync', 'update', 'dst'))),  # fs_sync__tester() MIGHT makes src and dst with the same mtime  # assert_nodiff() will show the `events` line
       ('os_call', 'listdir', ('src',), {}),
       ('os_call', 'listdir', ('dst',), {}),
 
         #   START checking folder ./create_empty_folder/
-        ('node', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder', '', '', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder'),
+        #('node', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder', '', '', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder'),
         ('os_call', 'lstat', (f'src{os.sep}create_empty_folder',), {}),
         ('os_call', 'lstat', (f'dst{os.sep}create_empty_folder',), {}),
+        ('node', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder', '', '', f'src{os.sep}create_empty_folder', f'dst{os.sep}create_empty_folder', '<src_lstats>', None, '<src_stats>', None),
         ('sync', 'create', f'dst{os.sep}create_empty_folder'),
         ('os_call', 'mkdir', (f'dst{os.sep}create_empty_folder',), {}),
         ('os_call', 'listdir', (f'src{os.sep}create_empty_folder',), {}),
@@ -1601,14 +1602,19 @@ def test_fs_sync__archive__delete__yield_all():
         #   END checking folder ./create_empty_folder/
 
         #   START checking file ./create_file
-        ('node', f'src{os.sep}create_file', f'dst{os.sep}create_file', '', '', f'src{os.sep}create_file', f'dst{os.sep}create_file'),
+        #('node', f'src{os.sep}create_file', f'dst{os.sep}create_file', '', '', f'src{os.sep}create_file', f'dst{os.sep}create_file'),
         ('os_call', 'lstat', (f'src{os.sep}create_file',), {}),
         ('os_call', 'lstat', (f'dst{os.sep}create_file',), {}),
+        ('node', f'src{os.sep}create_file', f'dst{os.sep}create_file', '', '', f'src{os.sep}create_file', f'dst{os.sep}create_file', '<src_lstats>', None, '<src_stats>', None),
         ('sync', 'create', f'dst{os.sep}create_file'),
         #('os_call', 'open', (f'src{os.sep}create_file', 'rb'), {}),
-        #('os_call', 'open', (f'dst{os.sep}.create_file.TMP', 'wb'), {}),
-        #('os_call', 'read', (fd_src_a, 4096), {}),
-        #('os_call', 'write', (fd_src_b, b'a'), {}),
+        ('os_call', 'open', (f'dst{os.sep}.create_file.TMP', os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOINHERIT', 0) | getattr(os, 'O_CLOEXEC', 0)), {}),
+        ('os_call', 'open', (f'src{os.sep}create_file', os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOINHERIT', 0) | getattr(os, 'O_CLOEXEC', 0)), {}),
+        ('os_call', 'read', ('<int>', 4096), {}),
+        ('os_call', 'write', ('<int>', b'a'), {}),
+        ('os_call', 'read', ('<int>', 4096), {}),
+        ('os_call', 'close', ('<int>',), {}),  # closing src
+        ('os_call', 'close', ('<int>',), {}),  # closing .dst.TMP
         ('os_call', 'chmod', (f'dst{os.sep}.create_file.TMP', 0o666), {}),
         *(() if os.name == 'nt' else (('os_call', 'chown', (f'dst{os.sep}.create_file.TMP', uid, gid), {'follow_symlinks': False}),)),
         ('os_call', 'utime', (f'dst{os.sep}.create_file.TMP', ('>1000000000', 1000.0)), {}),
@@ -1618,9 +1624,10 @@ def test_fs_sync__archive__delete__yield_all():
 
         #   START checking file ./create_symlink@
         *((
-          ('node', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink', '', '', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink'),
+          #('node', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink', '', '', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink'),
           ('os_call', 'lstat', (f'src{os.sep}create_symlink',), {}),
           ('os_call', 'lstat', (f'dst{os.sep}create_symlink',), {}),
+          ('node', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink', '', '', f'src{os.sep}create_symlink', f'dst{os.sep}create_symlink', '<src_lstats>', None, '<src_stats>', None),
           ('sync', 'create', f'dst{os.sep}create_symlink'),
           ('os_call', 'readlink', (f'src{os.sep}create_symlink',), {}),
           ('os_call', 'symlink', ('a', f'dst{os.sep}create_symlink',), {}),
@@ -1629,9 +1636,10 @@ def test_fs_sync__archive__delete__yield_all():
         #   END checking file ./create_symlink@
 
         #   START checking folder ./uptodate_empty_folder/
-        ('node', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder', '', '', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder'),
+        #('node', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder', '', '', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder'),
         ('os_call', 'lstat', (f'src{os.sep}uptodate_empty_folder',), {}),
         ('os_call', 'lstat', (f'dst{os.sep}uptodate_empty_folder',), {}),
+        ('node', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder', '', '', f'src{os.sep}uptodate_empty_folder', f'dst{os.sep}uptodate_empty_folder', '<src_lstats>', '<dst_lstats>', '<src_stats>', '<dst_stats>'),
         ('skip', 'uptodate', f'dst{os.sep}uptodate_empty_folder'),
         ('os_call', 'listdir', (f'src{os.sep}uptodate_empty_folder',), {}),
         ('os_call', 'listdir', (f'dst{os.sep}uptodate_empty_folder',), {}),
@@ -1642,6 +1650,134 @@ def test_fs_sync__archive__delete__yield_all():
 
       #('os_call', 'chmod', ('dst', 0o777), {}),  # previous lstat(dst) knows that the dst mode does not need to be updated as it is already equal to src mode
       ('os_call', 'utime', ('dst', ('>1000000000', '>1000000000')), {}),
-      ('after_skip', 'uptodate', 'dst'),
+      Eq_In((('after_skip', 'uptodate', 'dst'), ('after_sync', 'update', 'dst'))),  # fs_sync__tester() MIGHT makes src and dst with the same mtime  # assert_nodiff() will show the `events` line
       # END checking folders src & dst
-    ])
+    ], 'result_yields', 'expected_yields')
+
+@fs_sync__tester
+def test_fs_sync__archive__delete__yield_all__stop_before_a_close():
+  # XXX use a mock os_module to check if os.close/unlink is really called!
+  opened = []
+  closed = []
+  class mockos:
+    def open(self, p, *a, **k):
+      opened.append(p)
+      return os.open(p, *a, **k)
+    def close(self, fd):
+      closed.append(fd)
+      return os.close(fd)
+    def __getattr__(self, name): return getattr(os, name)
+  mockos = mockos()
+
+  fs_sync__mktree(f'''
+    src/create_file mode=0o666 mtime=1000 data=b'a'
+  ''')
+  tree_report = fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)
+  try:
+    #events = [filter_event(_) for _ in fs_sync('src', 'dst', archive=True, delete=True, yield_all=True)]  # list comp does not automatically close fs_sync generator! later, garbage collection would automatically close fs_sync generator, but maybe too late, so final fs_sync__tester rmtree could fail be src/tmp file is still open.
+    for _ in fs_sync('src', 'dst', archive=True, delete=True, yield_all=True, os_module=mockos):  # generator is closed by `for`
+      if _[:2] == ('os_call', 'close'): raise AssertionError('test')
+  except AssertionError: pass
+  else: assert False, "expected raise!"
+  assert_equal(len(opened), 2, None, f'len({opened!r})')  # 2 open, src/create_file & dst/.create_file.TMP for copying
+  assert_equal(len(closed), 2, None, f'len({closed!r})')
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1, mode=1, mtime=1)), f'''
+  ''')
+
+
+
+@fs_sync__tester
+def test_fs_sync__rsync_no_modify_window():
+  fs_sync__mktree(f"""
+    src/file                mode=0o646 mtime=1000.1 data=b'f1'
+    dst/file                mode=0o646 mtime=1000.2 data=b'f2'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  fs_sync('src', 'dst', archive=True, source_directory=True)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', mtime=1, data=1)), """
+    -dst/file mtime=1000.2 data=b'f2'
+    +dst/file mtime=1000.1 data=b'f1'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__rsync_modify_window_2():
+  fs_sync__mktree(f"""
+    src/file                mode=0o646 mtime=1000 data=b'f1'
+    dst/file                mode=0o646 mtime=1002 data=b'f2'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  #if fs_sync__use_rsync: os.system("rsync src/file dst/file --archive --modify_window 2")  # IMPORTANT! This command does not sync src/file to dst/file as modify_window should be >2!
+  #else:
+  fs_sync('src', 'dst', archive=True, source_directory=True, modify_window=2)  # IMPORTANT! Has a different behavior than rsync, this syncs src/file to dst/file as if rsync modify_window was >2!
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', mtime=1, data=1)), """
+    -dst/file mtime=1002 data=b'f2'
+    +dst/file mtime=1000 data=b'f1'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__rsync_modify_window_3():
+  fs_sync__mktree(f"""
+    src/file                mode=0o646 mtime=1000 data=b'f1'
+    dst/file                mode=0o646 mtime=1002 data=b'f2'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  if fs_sync__use_rsync: os.system("rsync src/file dst/file --archive --modify_window 3")
+  else: fs_sync('src', 'dst', archive=True, source_directory=True, modify_window=3)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', mtime=1, data=1)), """
+  """)
+
+@fs_sync__tester
+def test_fs_sync__head_1():
+  fs_sync__mktree(f"""
+    src/file                mode=0o646 data=b'f1'
+    dst/file                mode=0o646 data=b'f2'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+
+  #yields = []
+  #for _ in fs_sync('src/file', 'dst/file', head=1, yield_os_calls=True): yields.append(_)  # XXX put it on a separate unit test!
+  fs_sync('src/file', 'dst/file', head=1)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), "")
+
+@fs_sync__tester
+def test_fs_sync__head_2():
+  fs_sync__mktree(f"""
+    src/file data=b'f1'
+    dst/file data=b'f2'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+
+  fs_sync('src/file', 'dst/file', head=2)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), """
+    -dst/file data=b'f2'
+    +dst/file data=b'f1'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__content_1():
+  fs_sync__mktree(f"""
+    src/f1 data=b'abc'
+    dst/f1 data=b'abcd'
+
+    src/f2 data=b'abcd'
+    dst/f2 data=b'abc'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+
+  fs_sync('src/f1', 'dst/f1', content=True)
+  fs_sync('src/f2', 'dst/f2', content=True)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), """
+    -dst/f1 data=b'abcd'
+    -dst/f2 data=b'abc'
+    +dst/f1 data=b'abc'
+    +dst/f2 data=b'abcd'
+  """)

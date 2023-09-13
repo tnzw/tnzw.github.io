@@ -1,4 +1,4 @@
-# posixpath2.py Version 1.1.1
+# posixpath2.py Version 1.2.0
 # Copyright (c) 2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
@@ -6,7 +6,7 @@
 # To Public License, Version 2, as published by Sam Hocevar. See
 # http://www.wtfpl.net/ for more details.
 
-def posixpath2(os_module=None, *, use_environ=True, supports_unicode_filenames=False, get_user_home=None, keep_double_initial_slashes=True):
+def posixpath2(os_module=None, *, supports_unicode_filenames=False, use_environ=True, get_user_home=None, keep_double_initial_slashes=True, lowercase=False):
   _module__func = posixpath2
   _module__name__ = _module__func.__name__ if __name__ == '__main__' else (__name__ + '.' + _module__func.__name__)
   #if __name__ != '__main__': _module__name__ = __name__ + '.' + _module__name__
@@ -17,6 +17,10 @@ def posixpath2(os_module=None, *, use_environ=True, supports_unicode_filenames=F
     export.__name__ = _module__name__
   export.__doc__ = _module__func.__doc__
   export._mk_module = _module__func
+
+  _use_environ = True if use_environ else False; del use_environ
+  _keep_double_initial_slashes = True if keep_double_initial_slashes else False; del keep_double_initial_slashes
+  _lowercase = True if lowercase else False; del lowercase
 
   # beginning of module #
 
@@ -77,14 +81,20 @@ def posixpath2(os_module=None, *, use_environ=True, supports_unicode_filenames=F
     if isinstance(paths[0], bytes): sep = b'/'; curdir = b'.'
     else: sep = '/'; curdir = '.'
     try:
-      split_paths = [p.split(sep) for p in paths]
+      if _lowercase: split_paths = [p.lower().split(sep) for p in paths]
+      else:          split_paths = [        p.split(sep) for p in paths]
       try: isabs, = {p[:1] == sep for p in paths}
       except ValueError: raise ValueError("Can't mix absolute and relative paths") from None
       split_paths = [[c for c in s if c and c != curdir] for s in split_paths]  # removes empty names, curdir names and root
-      s1 = min(split_paths); s2 = max(split_paths); common = s1
+      s1 = min(split_paths); s2 = max(split_paths)
+      if _lowercase:
+        common = paths[0].split(sep)
+        common = [c for i, c in zip(range(len(s1)), common) if c and c != curdir]  # removes empty names, curdir names and root
+      else:
+        common = s1
       for i, c in enumerate(s1):
         if c != s2[i]:
-          common = s1[:i]
+          common = common[:i]
           break
       return (sep if isabs else sep[:0]) + sep.join(common)
     except (TypeError, AttributeError):
@@ -135,13 +145,15 @@ If any component is an absolute path, all previous path components
 will be discarded.  An empty last part will result in a path that
 ends with a separator."""
     return _join(*(_fspath(p) for p in (path,) + paths))
-  def normcase(path): return _fspath(path)  # ~noop
+  def normcase(path):
+    if _lowercase: return _fspath(path).lower()
+    return _fspath(path)
   def _normpath(fspath):
     # Algorithm copied from https://github.com/python/cpython/blob/3.11/Lib/posixpath.py#L350
     if isinstance(fspath, bytes): sep = b'/'; empty = b''; dot = b'.'; dotdot = b'..'
     else:                         sep =  '/'; empty =  ''; dot =  '.'; dotdot =  '..'
     if fspath == empty: return dot
-    if fspath.startswith(sep): initial_slashes = 2 if keep_double_initial_slashes and fspath.startswith(sep * 2) and not fspath.startswith(sep * 3) else 1
+    if fspath.startswith(sep): initial_slashes = 2 if _keep_double_initial_slashes and fspath.startswith(sep * 2) and not fspath.startswith(sep * 3) else 1
     else: initial_slashes = 0
     comps = fspath.split(sep)
     new_comps = []
@@ -280,7 +292,7 @@ leading dots.  Returns "(root, ext)"; ext may be empty."""
       i = path.find(sep, 1)
       if i < 0: i = len(path)
       if i == 1:
-        if use_environ and hasattr(os_module.environ) and 'HOME' in os_module.environ: userhome = os_module.environ['HOME']
+        if _use_environ and hasattr(os_module.environ) and 'HOME' in os_module.environ: userhome = os_module.environ['HOME']
         # XXX also use a fake pwd module?
         elif get_user_home is not None: userhome = get_user_home(path[1:1])
         else: return path

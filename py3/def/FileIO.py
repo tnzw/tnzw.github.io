@@ -1,5 +1,5 @@
-# FileIO.py Version 2.1.2
-# Copyright (c) 2020-2022 <tnzw@github.triton.ovh>
+# FileIO.py Version 2.1.3
+# Copyright (c) 2020-2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -7,6 +7,10 @@
 # http://www.wtfpl.net/ for more details.
 
 class FileIO(object):
+  """\
+fileobj = FileIO('my_file', 'rb')
+fileobj = FileIO(os.open('my_file', os.O_RDONLY))
+"""
   # https://docs.python.org/3/library/io.html#io.FileIO
   # dir(io.FileIO()) → ['__IOBase_closed', '__class__',
   #  '__del__', '__delattr__', '__dict__', '__dir__', '__doc__', '__enter__', '__eq__', '__exit__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__iter__', '__le__', '__lt__', '__ne__', '__new__', '__next__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__',
@@ -34,37 +38,40 @@ class FileIO(object):
   def closefd(self): return self._closefd
   def fileno(self): return self._fileno
 
-  mode = "r"
-  name = ""
-  def __init__(self, name, mode="r", closefd=True, opener=None, *, blksize=None, os_module=None):
+  mode = 'r'
+  name = ''
+  def __init__(self, name, mode='r', closefd=True, opener=None, *, blksize=None, os_module=None):
+    self._closed = False
+    self._fileno = None
+    if os_module is None: os_module = os
+    self._os_module = os_module
+    self.name = name
+    self._closefd = bool(closefd)  # Should only be used on __del__ method.
     if blksize is None: blksize = -1
     elif not isinstance(blksize, int): raise TypeError("blksize is not of type 'int'")
-    self._closed = False
-    if os_module is None: os_module = os
-    self._fileno = None
-    self._os_module = os_module
-    if opener is None: opener = self._os_module.open
-    self.name = name  # could be PathLike, str, bytes or int XXX please check type!
-    # XXX according to original behavior, if name is int, then name is a fileno and so opener() should not be called even if defined!
-    # XXX closefd could be False only if name is a fileno, but is still True by default.
-    self._closefd = True if closefd else False  # XXX should only be used on __del__ method!
-    p,a,b,r,t,w,x = io_parsemode(mode)
-    flags = 0
-    if p: flags |= os_module.O_RDWR
-    elif r: flags |= os_module.O_RDONLY
-    else: flags |= os_module.O_WRONLY
-    if w: flags |= os_module.O_CREAT | os_module.O_TRUNC
-    elif x: flags |= os_module.O_CREAT | os_module.O_EXCL
-    elif a: flags |= os_module.O_CREAT | os_module.O_APPEND
-    # windows : + O_BINARY + O_NOINHERIT
-    flags |= getattr(os_module, "O_BINARY", 0) | getattr(os_module, "O_NOINHERIT", 0)
-    # linux : + O_CLOEXEC
-    flags |= getattr(os_module, "O_CLOEXEC", 0)
-    self.mode = a+r+w+x+"b"+p
-    self._readable = bool(r+p)
-    self._writable = bool(a+w+x+p)
-    self._seekable = True
-    self._fileno = opener(name, flags)
+    if isinstance(name, int):
+      self._fileno = name
+    else:
+      if not self._closefd: raise ValueError("Cannot use closefd=False with file name")
+      p,a,b,r,t,w,x = io_parsemode(mode)
+      if t: raise ValueError(f"invalid mode: {mode!r}")
+      flags = 0
+      if p: flags |= os_module.O_RDWR
+      elif r: flags |= os_module.O_RDONLY
+      else: flags |= os_module.O_WRONLY
+      if w: flags |= os_module.O_CREAT | os_module.O_TRUNC
+      elif x: flags |= os_module.O_CREAT | os_module.O_EXCL
+      elif a: flags |= os_module.O_CREAT | os_module.O_APPEND
+      # windows : + O_BINARY + O_NOINHERIT
+      flags |= getattr(os_module, "O_BINARY", 0) | getattr(os_module, "O_NOINHERIT", 0)
+      # linux : + O_CLOEXEC
+      flags |= getattr(os_module, "O_CLOEXEC", 0)
+      self.mode = a+r+w+x+"b"+p
+      self._readable = bool(r+p)
+      self._writable = bool(a+w+x+p)
+      self._seekable = True  # Yes, it is even "seekable" if O_APPEND.
+      if opener is None: opener = self._os_module.open
+      self._fileno = opener(name, flags)
     # https://docs.python.org/3/library/io.html#io.DEFAULT_BUFFER_SIZE
     if blksize < 0:
       if hasattr(os_module, "fstat"):

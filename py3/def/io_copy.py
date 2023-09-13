@@ -1,5 +1,5 @@
-# io_copy.py Version 1.0.0-2
-# Copyright (c) 2020-2021 Tristan Cavelier <t.cavelier@free.fr>
+# io_copy.py Version 1.0.1
+# Copyright (c) 2020-2021, 2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -34,7 +34,7 @@ opt:
         written = read
         yield read, written
       else:
-        for data in io_iterread1(fsrc, length=length, size=buffer_size):
+        for data in io_iterread1(fsrc, buffer_size, length):
           read += len(data)
           yield read, written
           fdst.write(data)
@@ -44,4 +44,4 @@ opt:
   io_copy.iter = iter
   return io_copy
 io_copy = io_copy()
-io_copy._required_globals = ["io_iterread1"]
+io_copy._required_globals = ['io_iterread1']

@@ -1,5 +1,5 @@
-# io_diff.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# io_diff.py Version 1.0.1
+# Copyright (c) 2020, 2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -14,7 +14,7 @@ io_diff(reader1, reader2, reader3..., length=1024, buffer_size=None) -> True if 
 """
   dsts = (dst,) + dsts
   l = 0
-  for data in io_iterread1(src, length=length, size=buffer_size):
+  for data in io_iterread1(src, buffer_size, length):
     data_len = len(data)
     l += data_len
     for dst in dsts:
@@ -25,4 +25,4 @@ io_diff(reader1, reader2, reader3..., length=1024, buffer_size=None) -> True if 
       if dst.read(1): return False
   return True
 
-io_diff._required_globals = ["io_iterread1"]
+io_diff._required_globals = ['io_iterread1']

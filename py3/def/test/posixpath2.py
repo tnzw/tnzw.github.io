@@ -151,3 +151,8 @@ def test_posixpath2__nodetests(fos):
   assert_equal(fos.path.isfile('404link'), False)
   assert_equal(fos.path.islink('404link'), True)
   assert_raise(FileNotFoundError, lambda: fos.path.getsize('404link'))
+
+def test_posixpath2__lowercase():
+  path = posixpath2._mk_module(os, lowercase=True)
+  assert_equal(path.commonpath(('HELLO/WORLD', 'hello/you')), 'HELLO')
+  assert_equal(path.normcase('HELLO/WORLD'), 'hello/world')

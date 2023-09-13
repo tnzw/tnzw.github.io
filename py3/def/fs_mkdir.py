@@ -1,5 +1,5 @@
-# fs_mkdir.py Version 1.2.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# fs_mkdir.py Version 1.2.1
+# Copyright (c) 2020, 2023 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -34,10 +34,10 @@ fs_mkdir(path, mode=0o777, parents=False)
   if parents > 0: root = ()
   else: root, path = path[:parents-1], path[parents-1:]
   for i in range(len(path) - 1):
-    try: os_module.mkdir(os_module.path.join(*root + path[:i + 1]), mode=mode)
+    try: os_module.mkdir(os_module.path.join(*root, *path[:i + 1]), mode=mode)
     except FileExistsError: pass
     except OSError as e: return update(e, syscall="mkdir")
-  try: os_module.mkdir(os_module.path.join(*root + path), mode=mode)
+  try: os_module.mkdir(os_module.path.join(*root, *path), mode=mode)
   except FileExistsError as e:
     if not exist_ok: return update(e, syscall="mkdir")
   except OSError as e: return update(e, syscall="mkdir")
