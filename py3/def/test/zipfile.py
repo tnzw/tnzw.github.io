@@ -444,3 +444,39 @@ def test_zipfile__zip64_100000000():  # XXX
   # 000000D0   50 4B 06 07  00 00 00 00  98 00 00 00  01 00 00 00  PK..............
   # 000000E0   01 00 00 00  50 4B 05 06  00 00 00 00  01 00 01 00  ....PK..........
   # 000000F0   54 00 00 00  FF FF FF FF  00 00                     T.........
+
+def test_zipfile__data_descriptor_injection():
+  #     [local file header with stream flag]
+  #     [file data]  that contains:
+  #       [injected valid data descriptor] crc32(empty) 0 0
+  #       [injected local file without stream] crc32(next data descriptor that contains this crc32) 16 16
+  #     [data descriptor]  seen as part of injected file data
+  #     [central dir record]  here crc32 must match the correct file data!!!!
+  #     [eocd]
+  REG_MODE = 0o100644
+  FILE_DATA = (
+    zipfile_struct_mkddrecord(0, 0, 0) +
+    zipfile_struct_mklocrecord(0xA, 0, 0, 0, zlib_crc32(zipfile_struct_mkddrecord(zlib_crc32(b'impossible generate valid crc32'), 16, 16)), 16, 16, b'2'))
+  #EOCD_COMMENT = (
+  #  zipfile_struct_mkeocdrecord(0, 0, 2, 2, XXX, 31 + len(FILE_DATA)))     # also try with 1 instead of 2
+
+  g = zipfile_archive_pipegen(); next(g)
+  data = g.send(('entry', {'path': '1', 'st_mode': REG_MODE}))
+  data += g.send(('data', FILE_DATA))
+  data += g.send(('close',))
+  # XXX now try to add a comment to the eocd record and put fake cen+eocd record
+  #   and let's see how 7z handles this ;)
+  #   hm, I can't build a valid fake eocd record as I need to put central size + local size == total size - eocd record size (which is possible,
+  #     but then I can't parse central records)
+
+  print(data)
+  #open(os.path.join(os.path.expanduser('~'), 'Desktop', 'tmp', 'tmp', test.zip'), 'wb').write(data)
+
+if 0:
+  try:
+    exec(open('E:/tc/py3/pythoncustom.py', 'rb').read(), globals(), globals())
+    test_zipfile__data_descriptor_injection()
+    input('press enter to continue...')
+  except Exception as err:
+    print(err)
+    input('press enter to continue...')

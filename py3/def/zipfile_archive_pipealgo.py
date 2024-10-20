@@ -1,5 +1,5 @@
-# zipfile_archive_pipealgo.py Version 1.0.0
-# Copyright (c) 2023 <tnzw@github.triton.ovh>
+# zipfile_archive_pipealgo.py Version 1.0.1
+# Copyright (c) 2023-2024 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -86,8 +86,8 @@ Usage:
       if st_mtime is None: st_mtime = time.time()
       st_mtime_offset = entry.get('st_mtime_offset', None)
       try:
-        if st_mtime_offset == 'utc':      ddt = dosdatetime_fromutctimestamp(st_mtime, True)
-        elif st_mtime_offset is not None: ddt = dosdatetime_fromutctimestamp(st_mtime + st_mtime_offset, True)
+        if st_mtime_offset == 'utc':      ddt = dosdatetime_utcfromtimestamp(st_mtime, True)
+        elif st_mtime_offset is not None: ddt = dosdatetime_utcfromtimestamp(st_mtime + st_mtime_offset, True)
         else:                             ddt = dosdatetime_fromtimestamp(st_mtime, True)
         if ddt > 0xFFFFFFFF: ddt = 0
       # set ddt = 0 if st_mtime is lower than 1980-01-01 00:00:00 (eg < 315532800 in GMT+0 systems)
@@ -135,4 +135,4 @@ Usage:
   else:
     raise RuntimeError('invalid state')
   return (state, loc_size, entry_count, cen_data, fn, fe, nte, vm, ddt, ea, offset, crc32, compressed_size, uncompressed_size), b''.join(res), False
-zipfile_archive_pipealgo._required_globals = ['dosdatetime_fromtimestamp', 'dosdatetime_fromutctimestamp', 'ntfstime_fromtimestamp', 'zipfile_struct_mkcenrecord', 'zipfile_struct_mkdd64record', 'zipfile_struct_mkddrecord', 'zipfile_struct_mkeocd64record', 'zipfile_struct_mkeocd64locatorrecord', 'zipfile_struct_mkeocdrecord', 'zipfile_struct_mklocrecord', 'zipfile_struct_mkntfstimeextrafield', 'zipfile_struct_mkunicodepathextrafield', 'zipfile_struct_mkzip64extrafield', 'zlib_crc32']
+zipfile_archive_pipealgo._required_globals = ['dosdatetime_fromtimestamp', 'dosdatetime_utcfromtimestamp', 'ntfstime_fromtimestamp', 'zipfile_struct_mkcenrecord', 'zipfile_struct_mkdd64record', 'zipfile_struct_mkddrecord', 'zipfile_struct_mkeocd64record', 'zipfile_struct_mkeocd64locatorrecord', 'zipfile_struct_mkeocdrecord', 'zipfile_struct_mklocrecord', 'zipfile_struct_mkntfstimeextrafield', 'zipfile_struct_mkunicodepathextrafield', 'zipfile_struct_mkzip64extrafield', 'zlib_crc32']

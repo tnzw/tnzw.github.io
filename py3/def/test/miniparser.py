@@ -8,13 +8,13 @@ def miniparser__test_comp_values(comp, string, pos, endpos, expected):
 
 def test_miniparser__string():
   string = miniparser.string
-  miniparser__test_comp_matches(string('abc'), 'abce', 0, 4, [['abce', 0, 4, 0, 3, 'abc']])  # /abc/ on 'abce'
-  miniparser__test_comp_matches(string('abc'), 'eabce', 1, 5, [['eabce', 1, 5, 1, 4, 'abc']])  # /abc/ on 'eabce'
+  miniparser__test_comp_matches(string('abc'), 'abce', 0, 4, [['abce', 0, 4, 0, 3]])  # /abc/ on 'abce'
+  miniparser__test_comp_matches(string('abc'), 'eabce', 1, 5, [['eabce', 1, 5, 1, 4]])  # /abc/ on 'eabce'
 
 def test_miniparser__istring():
   istring = miniparser.istring
-  miniparser__test_comp_matches(istring('abC'), 'aBce', 0, 4, [['aBce', 0, 4, 0, 3, 'aBc']])  # /abC/i on 'aBce'
-  miniparser__test_comp_matches(istring('aBc'), 'eAbce', 1, 5, [['eAbce', 1, 5, 1, 4, 'Abc']])  # /aBc/i on 'eAbce'
+  miniparser__test_comp_matches(istring('abC'), 'aBce', 0, 4, [['aBce', 0, 4, 0, 3]])  # /abC/i on 'aBce'
+  miniparser__test_comp_matches(istring('aBc'), 'eAbce', 1, 5, [['eAbce', 1, 5, 1, 4]])  # /aBc/i on 'eAbce'
 
 def test_miniparser__some():
   string = miniparser.string
@@ -64,6 +64,12 @@ def test_miniparser__some():
   miniparser__test_comp_values(some(string('a'), 2, 3, possessive=True), 'aaaa', 0, 4, [[*'aaa']])  # /a{2,3}+/ on 'aaaa'
   miniparser__test_comp_values(some(string('a'), 3, 3, possessive=True), 'aaaa', 0, 4, [[*'aaa']])  # /a{3,3}+/ on 'aaaa'
 
+  miniparser__test_comp_values(some(string('')), 'a', 0, 1, [[''], []])  # /(?:)*/ on 'a'
+  miniparser__test_comp_values(some(string(''), 0, 3), 'a', 0, 1, [[''], []])  # /(?:){0,3}/ on 'a'
+  miniparser__test_comp_values(some(string(''), 2, 3), 'a', 0, 1, [['', '']])  # /(?:){2,3}/ on 'a'
+  miniparser__test_comp_values(some(string(''), possessive=True), 'a', 0, 1, [['']])  # /(?:)*+/ on 'a'
+
+
 def test_miniparser__chain():
   string = miniparser.string
   some = miniparser.some
@@ -86,6 +92,44 @@ def test_miniparser__chain():
     ['aaa', 0, 3, 0, 1, [[], ['a']]],
     ['aaa', 0, 3, 0, 0, [[], []]]])
 
+  miniparser__test_comp_matches(chain(some(string('a')), some(string('a')), possessive=True), 'aaa', 0, 3, [  # /(?>a*a)/ on 'aaa'
+    ['aaa', 0, 3, 0, 3, [[*'aaa'], []]]])
+
+  miniparser__test_comp_matches(chain(), 'abc', 0, 3, [['abc', 0, 3, 0, 0, []]])
+
+def test_miniparser__chain_partial():
+  string = miniparser.string
+  select = miniparser.select
+  chain = miniparser.chain
+  miniparser__test_comp_matches(chain(select(string('a'), string('a')), string('b'), string('c'), partial=True), 'abc', 0, 3, [
+    ['abc', 0, 3, 0, 3, ['a', 'b', 'c']],
+    ['abc', 0, 3, 0, 2, ['a', 'b']],
+    ['abc', 0, 3, 0, 1, ['a']],
+    ['abc', 0, 3, 0, 3, ['a', 'b', 'c']],
+    ['abc', 0, 3, 0, 2, ['a', 'b']],
+    ['abc', 0, 3, 0, 1, ['a']],
+    ['abc', 0, 3, 0, 0, []]])
+  miniparser__test_comp_matches(chain(select(string('a'), string('a')), string('b'), string('c'), partial=True), 'ab', 0, 2, [
+    ['ab', 0, 2, 0, 2, ['a', 'b']],
+    ['ab', 0, 2, 0, 1, ['a']],
+    ['ab', 0, 2, 0, 2, ['a', 'b']],
+    ['ab', 0, 2, 0, 1, ['a']],
+    ['ab', 0, 2, 0, 0, []]])
+  miniparser__test_comp_matches(chain(select(string('a'), string('a')), string('b'), string('c'), partial=True, lazy=True), 'ab', 0, 2, [
+    ['ab', 0, 2, 0, 0, []],
+    ['ab', 0, 2, 0, 1, ['a']],
+    ['ab', 0, 2, 0, 2, ['a', 'b']],
+    ['ab', 0, 2, 0, 1, ['a']],
+    ['ab', 0, 2, 0, 2, ['a', 'b']]])
+  miniparser__test_comp_matches(chain(select(string('a'), string('a')), string('b'), string('c'), partial=True, lazy=True), 'abc', 0, 3, [
+    ['abc', 0, 3, 0, 0, []],
+    ['abc', 0, 3, 0, 1, ['a']],
+    ['abc', 0, 3, 0, 2, ['a', 'b']],
+    ['abc', 0, 3, 0, 3, ['a', 'b', 'c']],
+    ['abc', 0, 3, 0, 1, ['a']],
+    ['abc', 0, 3, 0, 2, ['a', 'b']],
+    ['abc', 0, 3, 0, 3, ['a', 'b', 'c']]])
+
 def test_miniparser__select():
   string = miniparser.string
   select = miniparser.select
@@ -94,10 +138,15 @@ def test_miniparser__select():
   miniparser__test_comp_values(select(string('a'), string('b')), 'b', 0, 1, ['b'])  # `a|b` on 'b'
   miniparser__test_comp_values(select(some(string('a')), string('b')), 'b', 0, 1, [[], 'b'])  # `a*|b` on 'b'
   miniparser__test_comp_values(select(some(string('a')), some(string('b'))), 'b', 0, 1, [[], ['b'], []])  # `a*|b*` on 'b'
-  miniparser__test_comp_matches(select(some(string('a')), some(string('b')), getindex=True), 'b', 0, 1, [  # `a*|b*` on 'b'
+  miniparser__test_comp_matches(select(some(string('a')), some(string('b')), getindexvalue=True), 'b', 0, 1, [  # `a*|b*` on 'b'
     ['b', 0, 1, 0, 0, [0, []]],
     ['b', 0, 1, 0, 1, [1, ['b']]],
     ['b', 0, 1, 0, 0, [1, []]]])
+  miniparser__test_comp_matches(select(some(string('a')), some(string('b')), getindex=True), 'b', 0, 1, [  # `a*|b*` on 'b'
+    ['b', 0, 1, 0, 0, 0],
+    ['b', 0, 1, 0, 1, 1],
+    ['b', 0, 1, 0, 0, 1]])
+  miniparser__test_comp_matches(select(), 'b', 0, 1, [])
 
 def test_miniparser__atomic():
   string = miniparser.string
@@ -118,16 +167,60 @@ def test_miniparser__read():
 def test_miniparser__search():
   string = miniparser.string
   search = miniparser.search
-  miniparser__test_comp_matches(search(string('b')), 'fedcbabcdef', 0, 11, [['fedcbabcdef', 0, 11, 4, 5, 'b']])
-  miniparser__test_comp_matches(search(string('b'), fullmatch=True), 'fedcbabcdef', 0, 11, [['fedcbabcdef', 0, 11, 0, 5, ['fedc', 'b']]])
-  miniparser__test_comp_values(search(string('b'), fullmatch=True, possessive=False), 'fedcbabcdef', 0, 11, [['fedc', 'b'], ['fedcba', 'b']])
-  miniparser__test_comp_values(search(string('b'), fullmatch=True, lazy=False, possessive=False), 'fedcbabcdef', 0, 11, [['fedcba', 'b'], ['fedc', 'b']])
+  miniparser__test_comp_matches(search(string('b')), 'fedcbabcdef', 0, 11, [['fedcbabcdef', 0, 11, 4, 5]])
+  miniparser__test_comp_matches(search(string('b'), getscanned=True), 'fedcbabcdef', 0, 11, [['fedcbabcdef', 0, 11, 0, 5, ['fedc', 'b']]])
+  miniparser__test_comp_values(search(string('b'), getscanned=True, possessive=False), 'fedcbabcdef', 0, 11, [['fedc', 'b'], ['fedcba', 'b']])
+  miniparser__test_comp_values(search(string('b'), getscanned=True, lazy=False, possessive=False), 'fedcbabcdef', 0, 11, [['fedcba', 'b'], ['fedc', 'b']])
+
+def test_miniparser__block():
+  string = miniparser.string
+  block = miniparser.block
+  miniparser__test_comp_matches(block(string('{'), string('.'), string('}')), '{...}', 0, 5, [['{...}', 0, 5, 0, 5, ['{', ['.', '.', '.'], '}']]])
+
+def test_miniparser__some_sep():
+  string = miniparser.string
+  some_sep = miniparser.some_sep
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';')), '', 0, 0, [
+    ['', 0, 0, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';')), 'abc', 0, 3, [
+    ['abc', 0, 3, 0, 3, ['abc']],
+    ['abc', 0, 3, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';')), 'abc;abc', 0, 7, [
+    ['abc;abc', 0, 7, 0, 7, ['abc', ';', 'abc']],
+    ['abc;abc', 0, 7, 0, 3, ['abc']],
+    ['abc;abc', 0, 7, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';')), 'abc;abc;abc', 0, 11, [
+    ['abc;abc;abc', 0, 11, 0, 11, ['abc', ';', 'abc', ';', 'abc']],
+    ['abc;abc;abc', 0, 11, 0, 7, ['abc', ';', 'abc']],
+    ['abc;abc;abc', 0, 11, 0, 3, ['abc']],
+    ['abc;abc;abc', 0, 11, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';'), 0), 'abc;abc;abc', 0, 11, [
+    ['abc;abc;abc', 0, 11, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';'), 0, 1), 'abc;abc;abc', 0, 11, [
+    ['abc;abc;abc', 0, 11, 0, 3, ['abc']],
+    ['abc;abc;abc', 0, 11, 0, 0, []],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';'), 1, 2), 'abc;abc;abc', 0, 11, [
+    ['abc;abc;abc', 0, 11, 0, 7, ['abc', ';', 'abc']],
+    ['abc;abc;abc', 0, 11, 0, 3, ['abc']],
+  ])
+  miniparser__test_comp_matches(some_sep(string('abc'), string(';')), 'abc;abc;def;abc', 0, 15, [
+    ['abc;abc;def;abc', 0, 15, 0, 7, ['abc', ';', 'abc']],
+    ['abc;abc;def;abc', 0, 15, 0, 3, ['abc']],
+    ['abc;abc;def;abc', 0, 15, 0, 0, []],
+  ])
+
 
 def test_miniparser__calc_parser():
   mp = miniparser
   SPACES_OR_NOT = mp.some(mp.one_in(' \t'), 0, None)  # -> unused value
   def with_spaces_or_not(comp): return mp.editvalue(mp.chain(SPACES_OR_NOT, comp), lambda v: v[1])
-  INT = with_spaces_or_not(mp.edit(mp.some(mp.one_in('0123456789'), 1, None, possessive=True), lambda m: int(mp.match_getmatched(m), 10)))  # -> int
+  INT = with_spaces_or_not(mp.edit(mp.some(mp.one_in('0123456789'), 1, None, possessive=True), lambda m: int(mp.match_getslice(m), 10)))  # -> int
   FACTOR = with_spaces_or_not(mp.select(
     mp.editvalue(mp.chain(mp.string('('), SPACES_OR_NOT, mp.ref(lambda: EXPR), SPACES_OR_NOT, mp.string(')')), lambda v: v[2]),
     INT,
@@ -165,7 +258,7 @@ def test_miniparser__match_expand_parser():
 
   def expand_bytes_parser():
 
-    match_getmatched = miniparser.match_getmatched
+    match_getslice = miniparser.match_getslice
     match_getstring = miniparser.match_getstring
     match_getstart = miniparser.match_getstart
     match_getend = miniparser.match_getend
@@ -211,11 +304,11 @@ def test_miniparser__match_expand_parser():
           chain(has(some(O, 3)), critical(chain(D03, O, O), lambda s, p, e: ValueError(f'octal escape value {s[p - 1:e]} outside of range 0-0o377 at position {p - 1}'))),
           chain(string(_0), optional(O)),
         ),
-        lambda m: enc(chr(int(match_getmatched(m), 8))))  # -> str
+        lambda m: enc(chr(int(match_getslice(m), 8))))  # -> str
 
       GROUP_INDEX_ESCAPE_VALUE = edit(  # \\\d\d?
         chain(D19, optional(D)),
-        lambda m: ['group', int(match_getmatched(m), 10)])  # -> ['group', 99]
+        lambda m: ['group', int(match_getslice(m), 10)])  # -> ['group', 99]
 
       IDENT = chain(one_in(_aword_), some(one_in(_word_), possessive=True), ENDPOS)
       def isidentifier(string):
@@ -223,7 +316,7 @@ def test_miniparser__match_expand_parser():
         return False
 
       def parse_group_name(m):
-        name = match_getmatched(m)[2:-1]
+        name = match_getslice(m)[2:-1]
         try: name = int(name if isinstance(name, str) else bytes(name), 10)  # only works with str and bytes-like object
         except ValueError:
           # here name is never empty thanks to critical "missing group name..."
@@ -242,11 +335,11 @@ def test_miniparser__match_expand_parser():
 
       CHAR_ESCAPE_VALUE = edit(  # \\[\\abfnrtv]
         one_in(enc('\\abfnrtv')),
-        lambda m: _bsol_dict[match_getmatched(m)])  # -> str
+        lambda m: _bsol_dict[match_getslice(m)])  # -> str
 
       NON_ASCII_ESCAPE_VALUE = edit(
         one_not_in(enc('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')),  # alphanum
-        lambda m: _BSOL + match_getmatched(m))  # -> str
+        lambda m: _BSOL + match_getslice(m))  # -> str
 
       ESCAPE = editvalue(
         chain(
@@ -322,7 +415,6 @@ def test_miniparser__match_expand_parser():
 def test_miniparser__content_type_parser():
   # https://www.rfc-editor.org/rfc/rfc9110#field.content-type
   mp = miniparser
-  def v_group0(comp): return mp.edit(comp, lambda m: mp.match_getmatched(m))
   def smartjoin(iterable):
     r = []; n = True
     for i in iterable:
@@ -341,14 +433,14 @@ def test_miniparser__content_type_parser():
   _tchars_ = b"!#$%&'*+-.^_`|~" + _digit_ + _alpha_
   _vchars_ = bytes(i for i in range(0x21, 0x7F))  # [\x21-\x7e]
   # https://www.rfc-editor.org/rfc/rfc9110#name-whitespace
-  OWS = v_group0(mp.some(mp.one_in(b' \t')))  # optional whitespace
+  OWS = mp.some(mp.one_in(b' \t'), getvalues=False)  # optional whitespace
   # https://www.rfc-editor.org/rfc/rfc9110#name-quoted-strings
   obs_text = mp.one_cond(lambda b: b >= 0x80)
   quoted_pair = mp.chain(mp.string(b'\\'), mp.select(mp.one_in(b'\t ' + _vchars_), obs_text))
   qdtext = mp.select(mp.one_in(b'\t ' + bytes(b for b in _vchars_ if b != 0x22 and b != 0x5C)), obs_text)
   quoted_string = mp.chain(mp.string(b'"'), v_smartjoin(mp.some(mp.select(qdtext, quoted_pair))), mp.string(b'"'))
   # https://www.rfc-editor.org/rfc/rfc9110#name-tokens
-  token = v_group0(mp.some(mp.one_in(_tchars_), 1, None))
+  token = mp.some(mp.one_in(_tchars_), 1, None, getvalues=False)
   # https://www.rfc-editor.org/rfc/rfc9110#name-parameters
   parameter_name = token
   parameter_value = mp.select(token, quoted_string)
@@ -369,6 +461,56 @@ def test_miniparser__content_type_parser():
   assert parser(b'text/html;charset="u\\tf-8";key=value')
   assert not parser(b'text/html;charset="u\\tf-8";key=')
   assert not parser(b'text/html;charset="u\\tf-8')
+
+def test_miniparser__dataurl_parser():
+  # data:[<mediatype>][;base64],<data>
+  # NB: it seems impossible to put a comma in the <mediatype> secion, even in a parameter quoted value.
+  mp = miniparser
+  # /^(?<protocol>data:)(?<mediatype>[^]*?)(?:;[\t ]*(?<base64>base64)[\t ]*,|,)(?<data>[^]*)/i
+  parser = mp.mkparser(mp.chain(
+    mp.istring('data:'),  # data:
+    mp.some(mp.ONE, getvalues=False, lazy=True),  # <mediatype> (and parameters)
+    mp.editvalue(mp.select(  # extension
+      mp.chain(
+        mp.string(';'),
+        mp.some(mp.one_in('\t '), getvalues=False),
+        mp.istring('base64'),
+        mp.some(mp.one_in('\t '), getvalues=False),
+        mp.string(','),
+      ),
+      mp.chain(
+        mp.NOTHING,
+        mp.NOTHING,
+        mp.NOTHING,
+        mp.NOTHING,
+        mp.string(','),
+      ),
+    ), lambda v: v[2]),
+    mp.some(mp.ONE, getvalues=False),
+  ))  # -> [protocol: string, mediatype: string, extension: string, data: string]
+
+  # Firefox parses data url like this (`res = await fetch(dataurl); blob = await res.blob(); blob.type`)
+  # 'data: image / jpeg ; pname = pv al ; base64 ,  b64\nda ta'           -> 'data:image/jpeg;pname=pval;base64,b64data'
+  # 'data: image / jpeg ; pname = "pv al" ; base64 ,  b64\nda ta'         -> 'data:image/jpeg;pname=pval;base64,b64data'
+  # 'data: image / jpeg ; pname = "pv al ; base64 ,  b64\nda ta'          -> 'data:image/jpeg;pname=pval;base64,b64data'     # interesting...
+  # 'data: image / jpeg ; pname = "pv ; al ; base64 ,  b64\nda ta'        -> 'data:image/jpeg;pname="pv;al";base64,b64data'  # interesting...
+  # 'data: image / jpeg ; pname = "pv ; al ; base64 ,";base64,b64\nda ta' -> 'data:image/jpeg;pname="pv;al";base64,ERROR'    # interesting... (b64decode('";base64,b64\nda ta') fails)
+  # 'data:text/plain;p="a,",my text'                                      -> 'data:text/plain;p=a,",text'                    # interesting!
+  # 'data:text/plain;p="a,",my text'                                      -> 'data:text/plain,",text'                        # interesting!  (Chrome behavior)
+  # 'data:text/plain;p="a;base64,my text'                                 -> 'data:text/plain;p=a;base64,ERROR'              # interesting! (b64decode('my text') fails)
+  # 'data:text/plain;p=a%2Cb,text'                                        -> 'data:text/plain;p=a%2Cb,text'                  # interesting...
+  # 'data: image / jpeg ; pname = p"v\t al ; base64 ,  b64\nda ta'        -> 'data:image/jpeg;pname="p\\"val";base64,b64data'
+  # 'data: image / jpeg ; pname = " a ; b " ; base64 ,  b64\nda ta'       -> 'data:image/jpeg;pname="a;b";base64,b64data'
+  # 'data: image / jpeg/ ; pname = "pv al" ; base64 ,  b64\nda ta'        -> 'data:text/plain;charset=us-ascii;base64,b64data'
+  # 'data: image / jpeg ; pname = "pv al" ; base64 ; pother,  b64\nda ta' -> 'data:text/plain;charset=us-ascii,b64data'  # base64 encoding is ignored, base64 must be there for image/jpeg so it switched back to text/plain, and so ignore other parameters
+
+  assert parser('data:,') == ['data:', '', '', '']
+  assert parser('data:;base64,') == ['data:', '', 'base64', '']
+  assert parser('data:text/plain;charset=utf-8,text') == ['data:', 'text/plain;charset=utf-8', '', 'text']
+  assert parser('data: whatever in;side = "this section unless there is a comma, like this ", thanks') == ['data:', ' whatever in;side = "this section unless there is a comma', '', ' like this ", thanks']
+  assert parser('data: whatever in;side = "this section unless there is a; base64 , extension like this ", thanks') == ['data:', ' whatever in;side = "this section unless there is a', 'base64', ' extension like this ", thanks']
+  assert not parser('data:')  # must have a ','
+  assert not parser('data:text/plain;charset=us-ascii')  # must have a ','
 
 # XXX do test_miniparser__regexp():
 # XXX do test_miniparser__has():

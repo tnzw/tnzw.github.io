@@ -100,7 +100,7 @@ def fs_sync__mktree(treeschema, file_mode=None, dir_mode=None, auto_mtime=None, 
     elif typ == "lnk": fs_sync__mklnk(path, **opt)
     else: XXX
   for path, opt in dirs: fs_sync__mkdir(path, nomkdir=1, **opt)
-def fs_sync__reporttree(*paths, sep="/", top=False, size=False, data=False, mode=False, mtime=False, mtime_for_link=False, uid=False, gid=False, statconverter=None, os_module=None):
+def fs_sync__reporttree(*paths, sep="/", top=False, size=False, data=False, mode=False, mtime=False, mtime_for_link=False, uid=False, gid=False, statconverter=None, sort=True, os_module=None):
   report = []
   if os_module is None:
     os_module = os
@@ -147,6 +147,7 @@ def fs_sync__reporttree(*paths, sep="/", top=False, size=False, data=False, mode
         rec(head, tail + sep + name)
   #for path in paths: rec(path, path[:0])
   for path in paths: rec("", path, not top)
+  if sort: report.sort()
   return "\n".join(report)
 #def fs_sync__chkreportdiff(report1, report2):
 #  report = "\n".join(l for l in difflines(report1, report2).split("\n") if not l.startswith(" "))
@@ -1558,6 +1559,7 @@ def test_fs_sync__archive__delete__yield_all():
     def __init__(self, values): self.values = values
     def __eq__(self, other): return other in self.values
     def __repr__(self): return f'something in {self.values!r}'
+    #def __hash__(self): return hash(assert_nodiff.key(self.values))  # better use_no_hash
 
   fs_sync__mktree(grep_notsymlink(f'''
     src/create_empty_folder/ mode=0o777 mtime=9999
@@ -1652,7 +1654,7 @@ def test_fs_sync__archive__delete__yield_all():
       ('os_call', 'utime', ('dst', ('>1000000000', '>1000000000')), {}),
       Eq_In((('after_skip', 'uptodate', 'dst'), ('after_sync', 'update', 'dst'))),  # fs_sync__tester() MIGHT makes src and dst with the same mtime  # assert_nodiff() will show the `events` line
       # END checking folders src & dst
-    ], 'result_yields', 'expected_yields')
+    ], 'result_yields', 'expected_yields', use_no_hash=True)
 
 @fs_sync__tester
 def test_fs_sync__archive__delete__yield_all__stop_before_a_close():
@@ -1781,3 +1783,233 @@ def test_fs_sync__content_1():
     +dst/f1 data=b'abc'
     +dst/f2 data=b'abcd'
   """)
+
+@fs_sync__tester
+def test_fs_sync__archive_exclude_1():
+  fs_sync__mktree(f"""
+    src/f1 data=b'abc'
+    src/f2 data=b'abcd'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+
+  fs_sync('src', 'dst', archive=True, exclude=lambda p: p == f'src{os.sep}f2')
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), """
+    +dst/f1 data=b'abc'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__archive__filter(default_exclude=False, delete=None, delete_excluded=None):
+  fs_sync__mktree(f"""
+    src/src_only_file_include data=b''
+    src/src_only_file_exclude data=b''
+    src/src_only_file_show data=b''
+    src/src_only_file_hide data=b''
+    src/src_only_file_risk data=b''
+    src/src_only_file_protect data=b''
+    src/src_only_file_show_risk data=b''
+    src/src_only_file_show_protect data=b''
+    src/src_only_file_hide_risk data=b''
+    src/src_only_file_hide_protect data=b''
+
+    dst/dst_only_file_include data=b''
+    dst/dst_only_file_exclude data=b''
+    dst/dst_only_file_show data=b''
+    dst/dst_only_file_hide data=b''
+    dst/dst_only_file_risk data=b''
+    dst/dst_only_file_protect data=b''
+    dst/dst_only_file_show_risk data=b''
+    dst/dst_only_file_show_protect data=b''
+    dst/dst_only_file_hide_risk data=b''
+    dst/dst_only_file_hide_protect data=b''
+
+    src/both_file_include data=b''
+    src/both_file_exclude data=b''
+    src/both_file_show data=b''
+    src/both_file_hide data=b''
+    src/both_file_risk data=b''
+    src/both_file_protect data=b''
+    src/both_file_show_risk data=b''
+    src/both_file_show_protect data=b''
+    src/both_file_hide_risk data=b''
+    src/both_file_hide_protect data=b''
+    dst/both_file_include data=b''
+    dst/both_file_exclude data=b''
+    dst/both_file_show data=b''
+    dst/both_file_hide data=b''
+    dst/both_file_risk data=b''
+    dst/both_file_protect data=b''
+    dst/both_file_show_risk data=b''
+    dst/both_file_show_protect data=b''
+    dst/both_file_hide_risk data=b''
+    dst/both_file_hide_protect data=b''
+
+    src/src_only_dir/
+    src/src_only_dir/file data=b''
+
+    dst/dst_only_dir/
+    dst/dst_only_dir/file data=b''
+
+    src/dir_to_file/
+    dst/dir_to_file data=b''
+
+    src/file_to_dir data=b''
+    dst/file_to_dir/
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', data=1)
+
+  S = '[\\\\/]'
+  W = '[^\\\\/]*?'
+  WW = '.*?'
+  QM = '[^\\\\/]'
+  def filter(path, is_dir):
+    path = os.sep + path
+    sr = ['', '']
+    def is_ended():
+      return sr[0] and sr[1]
+    def include():
+      if not sr[0]: sr[0] = 'S'
+      if not sr[1]: sr[1] = 'r'
+      return is_ended()
+    def exclude():
+      if not sr[0]: sr[0] = 'H'
+      if not sr[1]: sr[1] = 'p'
+      return is_ended()
+    def show():
+      if not sr[0]: sr[0] = 'S'
+      return is_ended()
+    def hide():
+      if not sr[0]: sr[0] = 'H'
+      return is_ended()
+    def risk():
+      if not sr[1]: sr[1] = 'R'
+      return is_ended()
+    def protect():
+      if not sr[1]: sr[1] = 'P'
+      return is_ended()
+    def end():
+      return ''.join(sr)
+
+    """# exclusion list
+    + *include*
+    - *exclude*
+    S *show*
+    H *hide*
+    R *risk*
+    P *protect*
+    - */
+    """
+    if re.search(f'{S}{W}include{W}\\Z', path) and include(): return end()
+    if re.search(f'{S}{W}exclude{W}\\Z', path) and exclude(): return end()
+    if re.search(f'{S}{W}show{W}\\Z', path) and show(): return end()
+    if re.search(f'{S}{W}hide{W}\\Z', path) and hide(): return end()
+    if re.search(f'{S}{W}risk{W}\\Z', path) and risk(): return end()
+    if re.search(f'{S}{W}protect{W}\\Z', path) and protect(): return end()
+    if is_dir and re.search(f'{S}{W}\\Z', path) and exclude(): return end()
+    include()
+    return end()
+
+    # if re.search(f'{S}{W}3{W}\\Z', path) and include(): return (*sr,)
+    # if is_dir and re.search(f'{S}d\\Z', path): XXX test is_dir
+    # if re.search(f'\\A{S}include\\Z', path) and include(): return (*sr,)
+    # if re.search(f'\\A{S}exclude\\Z', path) and exclude(): return (*sr,)
+    # if re.search(f'\\A{S}show_risk\\Z', path) and SR(): return (*sr,)
+    # if re.search(f'\\A{S}show_protect\\Z', path) and SP(): return (*sr,)
+    # # if re.search(f'\\A{S}show\\Z', path) and S(): return (*sr,)
+    # if re.search(f'\\A{S}hide_risk\\Z', path) and HR(): return (*sr,)
+    # if re.search(f'\\A{S}hide_protect\\Z', path) and HP(): return (*sr,)
+    # if re.search(f'{S}{W}\\Z', path):
+    #assert False, f'invalid test initialization, no match for {path!r}'
+
+  fs_sync('src', 'dst', source_directory=True, target_directory=True, archive=True, filter=filter, delete=delete, delete_excluded=delete_excluded)
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', data=1)), '\n'.join([
+    "-dst/both_file_exclude data=b''" if delete_excluded else '',
+    "-dst/both_file_hide data=b''" if delete or delete_excluded else '',
+    "-dst/both_file_hide_risk data=b''" if delete or delete_excluded else '',
+    "-dst/dir_to_file data=b''" if (delete and fs_sync__use_rsync) or delete_excluded else '',
+    "-dst/dst_only_dir/" if delete_excluded else '',
+    "-dst/dst_only_dir/file data=b''" if delete_excluded else '',
+    "-dst/dst_only_file_exclude data=b''" if delete_excluded else '',
+    "-dst/dst_only_file_hide data=b''" if delete or delete_excluded else '',
+    "-dst/dst_only_file_hide_risk data=b''" if delete or delete_excluded else '',
+    "-dst/dst_only_file_include data=b''" if delete or delete_excluded else '',
+    "-dst/dst_only_file_risk data=b''" if delete or delete_excluded else '',
+    "-dst/dst_only_file_show data=b''" if delete or delete_excluded else '',
+    "-dst/dst_only_file_show_risk data=b''" if delete or delete_excluded else '',
+    "-dst/file_to_dir/",
+    "+dst/file_to_dir data=b''",
+    "+dst/src_only_file_include data=b''",
+    "+dst/src_only_file_protect data=b''",
+    "+dst/src_only_file_risk data=b''",
+    "+dst/src_only_file_show data=b''",
+    "+dst/src_only_file_show_protect data=b''",
+    "+dst/src_only_file_show_risk data=b''",
+  ]))
+
+@fs_sync__tester
+def test_fs_sync__archive__filter__delete():
+  test_fs_sync__archive__filter(delete=True)
+
+@fs_sync__tester
+def test_fs_sync__archive__filter__delete_excluded():
+  test_fs_sync__archive__filter(delete_excluded=True)
+
+@fs_sync__tester
+def test_fs_sync__name_key__lower():
+  fs_sync__mktree(f"""
+    src/a mtime=1000 data=b'abc'
+    dst/A mtime=1000 data=b'abc'
+
+    src/b mtime=1002 data=b'abc'
+    dst/B mtime=1002 data=b'abcd'
+
+    src/c/  mtime=1100
+    src/c/d mtime=1004 data=b'abc'
+    src/c/e mtime=1006 data=b'abc'
+    dst/C/  mtime=1100
+    dst/C/D mtime=1004 data=b'abcd'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  fs_sync('src', 'dst', archive=True, name_key=lambda x: x.lower())
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', mtime=1, data=1)), """
+    -dst/B mtime=1002 data=b'abcd'
+    +dst/B mtime=1002 data=b'abc'
+    -dst/C/D mtime=1004 data=b'abcd'
+    +dst/C/D mtime=1004 data=b'abc'
+    +dst/C/e mtime=1006 data=b'abc'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__name_key__length():
+  fs_sync__mktree(f"""
+    src/a mtime=1000 data=b'abc'
+    dst/b mtime=1000 data=b'abc'
+
+    src/cd mtime=1002 data=b'abc'
+    dst/ef mtime=1002 data=b'abcd'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  fs_sync('src', 'dst', archive=True, name_key=lambda x: len(x))
+
+  fs_sync__assert_report(fs_sync__diff(tree_report, fs_sync__reporttree('src', 'dst', mtime=1, data=1)), """
+    -dst/ef mtime=1002 data=b'abcd'
+    +dst/ef mtime=1002 data=b'abc'
+  """)
+
+@fs_sync__tester
+def test_fs_sync__name_key__length__name_error():
+  fs_sync__mktree(f"""
+    src/abc mtime=1004 data=b'abc'
+    src/def mtime=1004 data=b'def'
+  """)
+  tree_report = fs_sync__reporttree('src', 'dst', mtime=1, data=1)
+
+  try:
+    fs_sync('src', 'dst', archive=True, name_key=lambda x: len(x))
+    assert False, 'should raise ValueError'
+  except ValueError:  # name_key generated the same key twice in the same dir!
+    pass

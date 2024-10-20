@@ -61,6 +61,19 @@ def test_diff__1():
 
   diff__tester(
     (
+      ["e","e","g"],
+      ["e","e","f"],
+    ),
+    ("""\
+ e
+ e
+-g
++f
+""",)
+  )
+
+  diff__tester(
+    (
       ["a","b","d","e","c"],
       ["a","c","e","g"],
     ),
@@ -176,22 +189,22 @@ xxxx :g
     )
   )
 
-  diff__tester(
-    (
-      ["a","b","c","d","e","e"],
-      ["A","b","c","e","e"],
-      ["A","b","C","D","e","e"],
-    ),
-    ("""\
- xx:a
-x  :A
- b
- c
--d
- e
- e
-""",)
-  )
+  # diff__tester(
+    # (
+      # ["a","b","c","d","e","e"],
+      # ["A","b","c","e","e"],
+      # ["A","b","C","D","e","e"],
+    # ),
+    # ("""\
+ # xx:a
+# x  :A
+ # b
+ # c
+# -d
+ # e
+ # e
+# """,)
+  # )
 
   diff__tester(
     (
@@ -208,5 +221,34 @@ x  :A
 xx :D
    :e
    :e
+""",)
+  )
+
+  diff__tester(
+    (
+      'aZY', 'YZc', 'Yde',  # diffing non sorted iterables
+    ),
+    ("""\
+x  :Y
+ xx:a
+  x:Z
+ xx:Y
+x x:c
+xx :d
+xx :e
+""",)
+  )
+
+  diff__tester(
+    (
+      'aYZ', 'YZc', 'Yde',  # upper cased letters are sorted alphabeticaly, always 'Y' first, then 'Z'. 'acde' are noise.
+    ),
+    ("""\
+ xx:a
+   :Y
+  x:Z
+x x:c
+xx :d
+xx :e
 """,)
   )

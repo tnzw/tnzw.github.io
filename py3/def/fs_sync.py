@@ -1,12 +1,14 @@
-# fs_sync.py Version 3.0.5
-# Copyright (c) 2020-2023 <tnzw@github.triton.ovh>
-# This program is free software. It comes without any warranty, to
-# the extent permitted by applicable law. You can redistribute it
-# and/or modify it under the terms of the Do What The Fuck You Want
-# To Public License, Version 2, as published by Sam Hocevar. See
-# http://www.wtfpl.net/ for more details.
+# fs_sync.py Version 3.2.0
+#   This is free and unencumbered software released into the public domain.
+#   SPDX: Unlicense <http://unlicense.org/>
+#   Contributors: 2020-2024 <tnzw@github.triton.ovh>
 
-# Idea: make temporary file named like f'{tmp_prefix}{basename}.{random}{tmp_suffix}' where option tmp_prefix could be '.fs_sync.' and option tmp_suffix '.syncing'
+# Idea: make temporary file named like f'{tmp_prefix}{basename}.{random}{tmp_suffix}' where option tmp_prefix could be '.fs_sync.' and option tmp_suffix '.syncing.tmp'
+# Idea: add parameter use_ns_time=bool to use st_xtime_ns instead of st_xtime
+# Idea: use parameters like src_unlink to override os call os.unlink. (what parameters? src_unlink(src_common_path, src_stats)?) Do this for all the other os calls?
+# TODO implement
+#   prune_empty_dirs     prune empty directory chains from file-list
+# TODO Forget that paths could be strings!  Please use os.path.* methods only to control them!
 # TODO think about these options (other prints or yields?)
 #   progress    show progress during transfer → f'{bytes:d} {percent:03d}% {rate: 7.2f}{rate_unit}B/s {hours: 4d}:{minutes:02d}:{seconds:02d}'
 #   info=FLAGS  fine-grained informational verbosity
@@ -29,7 +31,7 @@
 #   eg   src/a matches dst/b so sync("src/a" with "dst/b")
 def fs_sync():
 
-  def fs_sync(src, dst, *, follow_symlinks=False, source_directory=None, target_directory=None, src_noent_ok=None, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, inplace=None, temp_dir=None, update=None, dirs=None, links=None, copy_links=None, copy_dirlinks=None, keep_dirlinks=None, perms=None, executability=None, chmod=None, owner=None, group=None, devices=None, specials=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_non_existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, force=None, chown=None, ignore_times=None, size_only=None, times_only=None, modify_window=None, src_time_offset=None, exclude=None, include=None, file_matcher=None, yields=None, yield_all=None, yield_info=None, yield_debug=None, yield_nodes=None, yield_sync=None, yield_skip=None, yield_os_calls=None, yield_all_errors=None, yield_sync_errors=None, yield_listdir_errors=None, verbose=None, onverbose=None, ignore_errors=None, ignore_sync_errors=None, ignore_listdir_errors=None, ignore_exdev_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
+  def fs_sync(src, dst, *, follow_symlinks=False, source_directory=None, target_directory=None, src_noent_ok=None, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, inplace=None, temp_dir=None, update=None, dirs=None, links=None, copy_links=None, copy_dirlinks=None, keep_dirlinks=None, perms=None, executability=None, chmod=None, owner=None, group=None, devices=None, specials=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_non_existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, delete_excluded=None, force=None, chown=None, ignore_times=None, size_only=None, times_only=None, modify_window=None, src_time_offset=None, filter=None, exclude=None, include=None, name_key=None, file_matcher=None, yields=None, yield_all=None, yield_info=None, yield_debug=None, yield_nodes=None, yield_sync=None, yield_skip=None, yield_os_calls=None, yield_all_errors=None, yield_sync_errors=None, yield_listdir_errors=None, verbose=None, onverbose=None, ignore_errors=None, ignore_sync_errors=None, ignore_listdir_errors=None, ignore_exdev_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
     """\
 fs_sync(src, dst, **opt)
 
@@ -79,6 +81,7 @@ fs_sync(src, dst, **opt)
     remove_source_files  sender removes synchronized files (non-dir)
     remove_source_dirs   sender removes synchronized dirs
     delete               delete extraneous files from dest dirs
+    delete_excluded      also delete excluded files from dest dirs
     force                force deletion of dirs even if not empty
     chown=(UID,GID)      affect file and directory username and groupname
     ignore_times         don't skip files that match in size and mod-time
@@ -86,8 +89,11 @@ fs_sync(src, dst, **opt)
     times_only           skip files that match in mtime
     modify_window=NUM    compare mod-times with reduced accuracy
     src_time_offset=NUM  use src times with additional seconds
+    filter=FUNC          exclude or include files using FUNC(common_path, is_dir)
+                         should returns bool|'include'|'exclude'|str([sShH]?[rRpP]?)
     exclude=FUNC         exclude files if FUNC(common_path) returns True
     include=FUNC         don't exclude files if FUNC(common_path) returns True
+    name_key=FUNC        match dir entry names with FUNC(base_name)
     file_matcher=FUNC    don't skip files if not FUNC(src, dst, src_stats, dst_stats)
     buffer_size          used for copying file. Could be either an int or None
 
@@ -136,14 +142,13 @@ fs_sync(src, dst, **opt)
 
   Here is a list of os methods and properties used by this tool:
 
-  - os.sep is used for path concatenation (os.altsep could also be used if exists);
   - os.stat(), os.lstat(), os.readlink() are used to compare nodes;
+    - stat used properties: st_atime, st_blksize, st_gid, st_mode, st_mtime, st_size and st_uid;
   - os.symlink(), os.utime(), os.chmod(), os.chown(), os.mkdir(), os.unlink(), os.rmdir(), os.replace() are used to create/update/delete nodes;
-  - os.open(), os.read(), os.write(), os.close(), os.O_RDONLY, os.O_WRONLY, os.O_CREAT, os.O_TRUNC, os.O_EXCL  (and optionaly os.O_BINARY, os.O_NOINHERIT, os.O_CLOEXEC) are used to copy/compare files content
+  - os.open(), os.read(), os.write(), os.close(), os.O_RDONLY, os.O_WRONLY, os.O_CREAT, os.O_TRUNC, os.O_EXCL  (and optionaly os.O_BINARY, os.O_NOINHERIT, os.O_CLOEXEC) are used to copy/compare files content;
   - os.listdir() is used when *_directory=True or recursive=True;
   - os.fspath() could be used if paths are not str or bytes;
-  - os.fsencode() could be used to get os.sep as bytes if paths are bytes;
-  - os.path.split(), os.path.join() is used to generate backup paths, temporary paths, etc.
+  - os.path.split(), os.path.join() is used for path manipulation.
 
 fs_sync.merge(src, dst, **kw)
   equiv fs_sync with archive=True
@@ -172,17 +177,6 @@ fs_sync.remove(dst, **kw)
       if cmd in ('raise',): raise
       if cmd is None: return False
       raise LookupError(f'invalid yield error command {cmd!r}')
-    def pathextend(path, *paths, sep=None, altsep=None):
-      paths = [_ for _ in (path,) + paths if _]
-      if paths: *paths, last = paths
-      else: return path
-      lsep = len(sep)  # assuming sep is never empty
-      if altsep:
-        laltsep = len(altsep)
-        paths = [_[:-lsep] if _[-lsep:] == sep else (_[:-laltsep] if _[-laltsep:] == altsep else _) for _ in paths] + [last]
-      else:
-        paths = [_[:-lsep] if _[-lsep:] == sep else _ for _ in paths] + [last]
-      return sep.join(paths)
     #def countendswith(s, suffix):
     #  l = len(suffix)
     #  i = 0
@@ -215,6 +209,10 @@ fs_sync.remove(dst, **kw)
       if suffix is None: suffix = b'~' if isinstance(dst, bytes) else '~'
       elif suffix: dst + suffix
       else: raise ValueError("suffix must not be empty")
+    if delete is None:
+      if delete_excluded: delete = True
+    elif not delete:
+      if delete_excluded: raise ValueError('delete_excluded conflicts with delete=False')
     if delete and not (recursive or dirs):
       raise ValueError("'delete' does not work without 'recursive' or 'dirs'")  # XXX it's rsync behavior, but what's the problem?
     if delete: force = True  # 'force' option is only relevant if 'delete' is not active
@@ -226,8 +224,6 @@ fs_sync.remove(dst, **kw)
       chown = True
     if src_time_offset is None: src_time_offset = 0
     _omit_link_copystat = True if omit_link_times is None or omit_link_times else False  # XXX Avoids NotImplementedError: chmod: follow_symlinks unavailable on this platform
-    if exclude is None: exclude = lambda _: False
-    if include is None: include = lambda _: False
     # any yield_*=True implies yields=True
     if yield_all:
       if yield_info is None: yield_info = True
@@ -269,26 +265,24 @@ fs_sync.remove(dst, **kw)
     if backup_dir and not isinstance(backup_dir, (str, bytes)): backup_dir = _os.fspath(backup_dir); dst + backup_dir
     if temp_dir and not isinstance(temp_dir, (str, bytes)): temp_dir = _os.fspath(temp_dir); dst + temp_dir
 
-    sep = _os.sep
-    altsep = getattr(_os, 'altsep', sep) or sep
-    if isinstance(src, bytes): fsencode = _os.fsencode; sep = fsencode(sep); altsep = fsencode(altsep); del fsencode
-
     custom_check = True if size_only or times_only or update or content or head is not None or file_matcher else False
 
-    def   _sync(    srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=False,      _in_backup=False,      follow_symlinks=False,           custom_check=custom_check, _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, exclude=exclude,         include=include,         file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=True,         verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os,  sep=sep,  altsep=altsep):
+    def   _sync(    srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=False,      _in_backup=False,      follow_symlinks=False,           custom_check=custom_check, _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, delete_excluded=delete_excluded, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, filter=filter, exclude=exclude, include=include, name_key=name_key, file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=True,         verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os):
       return   sync(  # [..] propagating some parameters to `sync()` (parent parameters are kept)
                     # line below produces a very long stacktrace line, prefer to explain with the line just above.
-                    srcname, dstname, src_dir=src_dir, dst_dir=dst_dir, src_lstats=src_lstats, dst_lstats=dst_lstats, src_stats=src_stats, dst_stats=dst_stats, _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=follow_symlinks, custom_check=custom_check, _src_dirlist=_src_dirlist, _dst_dirlist=_dst_dirlist, source_directory=source_directory, target_directory=target_directory, src_noent_ok=src_noent_ok, content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, exclude=exclude,         include=include,         file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=_top_verbose, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os,  sep=sep,  altsep=altsep)
+                    srcname, dstname, src_dir=src_dir, dst_dir=dst_dir, src_lstats=src_lstats, dst_lstats=dst_lstats, src_stats=src_stats, dst_stats=dst_stats, _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=follow_symlinks, custom_check=custom_check, _src_dirlist=_src_dirlist, _dst_dirlist=_dst_dirlist, source_directory=source_directory, target_directory=target_directory, src_noent_ok=src_noent_ok, content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, delete_excluded=delete_excluded, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, filter=filter, exclude=exclude, include=include, name_key=name_key, file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=_top_verbose, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os)
     if cast_sync is None: cast_sync = _sync
-    def sync(       srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=False,      _in_backup=False,      follow_symlinks=False,           custom_check=False,        _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=False,   head=None, recursive=False,     backup=False,  backup_dir=False,      suffix=None,   inplace=False,   temp_dir=None,     update=False,  dirs=False, links=False, copy_links=False,      copy_dirlinks=False,         keep_dirlinks=False,         perms=False, executability=False,         chmod=None,  owner=False, group=False, devices=False,   specials=False,    times=False, omit_dir_times=False,          omit_link_times=False,           _omit_link_copystat=True,                dry_run=False,   ignore_non_existing=False,               ignore_existing=False,           remove_source_files=False,               remove_source_dirs=False,              delete=False,  force=False, chown=False, chown_uid=-1,        chown_gid=-1,        ignore_times=False,        size_only=False,     times_only=False,      modify_window=None,          src_time_offset=None,            exclude=lambda _: False, include=lambda _: False, file_matcher=None,         yield_nodes=None,        yield_sync=None,       yield_skip=None,       yield_os_calls=None,           yield_sync_errors=None,              yield_listdir_errors=None,                 _top_verbose=True,         verbose=0,       onverbose=None,      ignore_errors=False,         ignore_sync_errors=None,               ignore_listdir_errors=False,                 ignore_exdev_errors=True,                onerror=None,    buffer_size=None,        os_module=None,      _os=None, sep=None, altsep=None):
-      def _sync(    srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=False,           custom_check=custom_check, _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, exclude=exclude,         include=include,         file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=True,         verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os,  sep=sep,  altsep=altsep):
+    def sync(       srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=False,      _in_backup=False,      follow_symlinks=False,           custom_check=False,        _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=False,   head=None, recursive=False,     backup=False,  backup_dir=False,      suffix=None,   inplace=False,   temp_dir=None,     update=False,  dirs=False, links=False, copy_links=False,      copy_dirlinks=False,         keep_dirlinks=False,         perms=False, executability=False,         chmod=None,  owner=False, group=False, devices=False,   specials=False,    times=False, omit_dir_times=False,          omit_link_times=False,           _omit_link_copystat=True,                dry_run=False,   ignore_non_existing=False,               ignore_existing=False,           remove_source_files=False,               remove_source_dirs=False,              delete=False,  delete_excluded=False,           force=False, chown=False, chown_uid=-1,        chown_gid=-1,        ignore_times=False,        size_only=False,     times_only=False,      modify_window=None,          src_time_offset=None,            filter=None,   exclude=None,    include=None,    name_key=None,     file_matcher=None,         yield_nodes=None,        yield_sync=None,       yield_skip=None,       yield_os_calls=None,           yield_sync_errors=None,              yield_listdir_errors=None,                 _top_verbose=True,         verbose=0,       onverbose=None,      ignore_errors=False,         ignore_sync_errors=None,               ignore_listdir_errors=False,                 ignore_exdev_errors=True,                onerror=None,    buffer_size=None,        os_module=None,      _os=None):
+      def _sync(    srcname, dstname, src_dir,         dst_dir,         src_lstats=None,       dst_lstats=None,       src_stats=None,      dst_stats=None,      _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=False,           custom_check=custom_check, _src_dirlist=None,         _dst_dirlist=None,         source_directory=False,            target_directory=False,            src_noent_ok=True,         content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, delete_excluded=delete_excluded, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, filter=filter, exclude=exclude, include=include, name_key=name_key, file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=True,         verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os):
         return sync(  # [..] propagating some parameters to `sync()` (parent parameters are forgotten)
                     # line below produces a very long stacktrace line, prefer to explain with the line just above.
-                    srcname, dstname, src_dir=src_dir, dst_dir=dst_dir, src_lstats=src_lstats, dst_lstats=dst_lstats, src_stats=src_stats, dst_stats=dst_stats, _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=follow_symlinks, custom_check=custom_check, _src_dirlist=_src_dirlist, _dst_dirlist=_dst_dirlist, source_directory=source_directory, target_directory=target_directory, src_noent_ok=src_noent_ok, content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, exclude=exclude,         include=include,         file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=_top_verbose, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os,  sep=sep,  altsep=altsep)
+                    srcname, dstname, src_dir=src_dir, dst_dir=dst_dir, src_lstats=src_lstats, dst_lstats=dst_lstats, src_stats=src_stats, dst_stats=dst_stats, _in_delete=_in_delete, _in_backup=_in_backup, follow_symlinks=follow_symlinks, custom_check=custom_check, _src_dirlist=_src_dirlist, _dst_dirlist=_dst_dirlist, source_directory=source_directory, target_directory=target_directory, src_noent_ok=src_noent_ok, content=content, head=head, recursive=recursive, backup=backup, backup_dir=backup_dir, suffix=suffix, inplace=inplace, temp_dir=temp_dir, update=update, dirs=dirs,  links=links, copy_links=copy_links, copy_dirlinks=copy_dirlinks, keep_dirlinks=keep_dirlinks, perms=perms, executability=executability, chmod=chmod, owner=owner, group=group, devices=devices, specials=specials, times=times, omit_dir_times=omit_dir_times, omit_link_times=omit_link_times, _omit_link_copystat=_omit_link_copystat, dry_run=dry_run, ignore_non_existing=ignore_non_existing, ignore_existing=ignore_existing, remove_source_files=remove_source_files, remove_source_dirs=remove_source_dirs, delete=delete, delete_excluded=delete_excluded, force=force, chown=chown, chown_uid=chown_uid, chown_gid=chown_gid, ignore_times=ignore_times, size_only=size_only, times_only=times_only, modify_window=modify_window, src_time_offset=src_time_offset, filter=filter, exclude=exclude, include=include, name_key=name_key, file_matcher=file_matcher, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_skip=yield_skip, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, _top_verbose=_top_verbose, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, ignore_exdev_errors=ignore_exdev_errors, onerror=onerror, buffer_size=buffer_size, os_module=os_module, _os=_os)
 
+      # IMPORTANT: here srcname and dstname MUST be relative paths!
+      #            (else it might cause _os.path.split()|join() issues)
       _noerr = True
-      src = pathextend(src_dir, srcname, sep=sep, altsep=altsep)
-      dst = pathextend(dst_dir, dstname, sep=sep, altsep=altsep)
+      src = _os.path.join(src_dir, srcname)
+      dst = _os.path.join(dst_dir, dstname)
       src_is_dst = src == dst
       tmp = tmp_fd = None
       _readlink = None
@@ -533,15 +527,12 @@ fs_sync.remove(dst, **kw)
           raise
         return True
 
-      def makedirsfor(path, parent, sep, altsep):
-        if altsep: path.replace(altsep, sep)
-        split = path.split(sep)
-        it = iter(split)
-        for _ in it: p = _; break
-        for _ in it:
-          try: yield from mkdir(pathextend(parent, p, sep=sep, altsep=altsep))
+      def makedirsfor(relpath, parent):
+        head, tail = _os.path.split(relpath)  # no need to use splitroot|splitdrive for relative paths
+        if head:
+          yield from makedirsfor(head, parent)
+          try: yield from mkdir(_os.path.join(parent, head))
           except FileExistsError: pass
-          p += sep + _
 
       def _copystat(dst, src_stats, dst_stats=None, dst_isdir=False, dst_islnk=False):
         # rsync copies the stats in any cases, without doing backup
@@ -572,8 +563,8 @@ fs_sync.remove(dst, **kw)
               yield from utime(dst, (src_stats.st_atime + src_time_offset, src_stats.st_mtime + src_time_offset), **opt)
 
       # XXX review the two methods below for yield_*{,_errors} and ignore_*_errors legitimity
-      def _rmtree(name, dir, lstats, dirlist=None): return sync(name, name, src_dir=dir, dst_dir=dir, src_lstats=lstats, dst_lstats=lstats, src_stats=lstats, dst_stats=lstats, _src_dirlist=dirlist, _dst_dirlist=dirlist, _top_verbose=False, _in_delete=True, remove_source_files=True, remove_source_dirs=True, recursive=True, links=True, devices=True, specials=True, custom_check=True, size_only=True, inplace=True, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, onerror=onerror, dry_run=dry_run, buffer_size=buffer_size, os_module=os_module, _os=_os, sep=sep, altsep=altsep)
-      def _dobackup(s, d, sd, dd, ls): return sync(s, d, src_dir=sd, dst_dir=dd, src_lstats=ls, src_stats=ls, _top_verbose=True, _in_backup=True, remove_source_files=True, remove_source_dirs=True, force=True, recursive=True, dirs=True, links=True, devices=True, specials=True, perms=perms, times=times, group=group, owner=owner, ignore_times=True, inplace=inplace, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, verbose=verbose, onverbose=onverbose, ignore_exdev_errors=ignore_exdev_errors, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, onerror=onerror, dry_run=dry_run, buffer_size=buffer_size, os_module=os_module, _os=_os, sep=sep, altsep=altsep)
+      def _rmtree(name, dir, lstats, dirlist=None): return sync(name, name, src_dir=dir, dst_dir=dir, src_lstats=lstats, dst_lstats=lstats, src_stats=lstats, dst_stats=lstats, _src_dirlist=dirlist, _dst_dirlist=dirlist, _top_verbose=False, _in_delete=True, remove_source_files=True, remove_source_dirs=True, recursive=True, links=True, devices=True, specials=True, custom_check=True, size_only=True, inplace=True, name_key=name_key, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, verbose=verbose, onverbose=onverbose, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, onerror=onerror, dry_run=dry_run, buffer_size=buffer_size, os_module=os_module, _os=_os)
+      def _dobackup(s, d, sd, dd, ls): return sync(s, d, src_dir=sd, dst_dir=dd, src_lstats=ls, src_stats=ls, _top_verbose=True, _in_backup=True, remove_source_files=True, remove_source_dirs=True, force=True, recursive=True, dirs=True, links=True, devices=True, specials=True, perms=perms, times=times, group=group, owner=owner, ignore_times=True, inplace=inplace, name_key=name_key, yield_nodes=yield_nodes, yield_sync=yield_sync, yield_os_calls=yield_os_calls, yield_sync_errors=yield_sync_errors, yield_listdir_errors=yield_listdir_errors, verbose=verbose, onverbose=onverbose, ignore_exdev_errors=ignore_exdev_errors, ignore_errors=ignore_errors, ignore_sync_errors=ignore_sync_errors, ignore_listdir_errors=ignore_listdir_errors, onerror=onerror, dry_run=dry_run, buffer_size=buffer_size, os_module=os_module, _os=_os)
 
       ##############################
       # HELPER FOR YIELD-FROM MESS #
@@ -636,7 +627,7 @@ fs_sync.remove(dst, **kw)
 
       def dobackup():
         if backup_dir:
-          yield from makedirsfor(dstname, backup_dir, sep, altsep)
+          yield from makedirsfor(dstname, backup_dir)
           yield from _dobackup(dstname, dstname, dst_dir, backup_dir, dst_lstats)
         else:  #if suffix:
           yield from _dobackup(dstname, dstname + suffix, dst_dir, dst_dir, dst_lstats)
@@ -734,23 +725,62 @@ fs_sync.remove(dst, **kw)
           for g in gg: ret = yield from g
         return ret
 
+      def parse_filter_result(res):  # -> show: bool, risk: bool
+        # res could be 'include', 'exclude', 'S', 'SR', 'HP', 'Sr', 'Hp'
+        if res is None or res is False or res in ('-', 'exclude'): return (False, True) if delete_excluded else (False, False)
+        if res is True or res in ('+', 'include'): return (True, True)
+        S = ''; R = ''
+        it = iter(res)
+        for c in it:
+          if c in ('s', 'S', 'h', 'H'):
+            if S: raise ValueError('invalid filter() result')
+            S = c
+            if R: break
+          elif c in ('r', 'R', 'p', 'P'):
+            if R: raise ValueError('invalid filter() result')
+            R = c
+            if S: break
+          else:
+            raise ValueError('invalid filter() result')
+        # if S is '' -> hide
+        # if R is '' -> protect
+        return S in ('s', 'S'), R in ('r', 'R', 'p') if delete_excluded else R in ('r', 'R')
+
+      if name_key:
+        def g_update(g, names, index):
+          for name in names:
+            kname = name_key(name)
+            l = g.get(kname, None)
+            if l is None: g[kname] = l = [False, False, name, name]
+            if l[index]:
+              # raise if a src_name or dst_name has two names with the same key
+              # XXX then control the error with a ignore_name_errors or something!
+              raise ValueError(f"name_key() generated the same result for {name!r} and {l[index + 2]!r} (in {'destination' if index else 'source'} directory {dst if index else src!r})")
+            l[index] = True
+            l[index + 2] = name
+      else:
+        def g_update(g, names, index):
+          for name in names:
+            if name not in g:
+              g[name] = [True, True, name, name]
+
       #####################
       # HANDLE PARAMETERS #
       #####################
 
       if source_directory or target_directory:
-        # XXX use normcase for compare? Add a parameter like use_normcase? XXX or add a custom name_key func?! then how can fs_sync create dst path.txt.lnk from src path.txt?
-        g = set()
-        if _src_dirlist is not None: g.update(_src_dirlist)
-        elif source_directory: _src_dirlist = yield from softlistdir(src); g.update(_src_dirlist)
-        if _dst_dirlist is not None: g.update(_dst_dirlist)
+        # Use normcase to compare? Add a parameter like use_normcase? No, let the system handle cases by itself.
+        g = {}
+        if _src_dirlist is not None: g_update(g, _src_dirlist, 0)
+        elif source_directory: _src_dirlist = yield from softlistdir(src); g_update(g, _src_dirlist, 0)
+        if _dst_dirlist is not None: g_update(g, _dst_dirlist, 1)
         elif target_directory:
           if src_is_dst: _dst_dirlist = _src_dirlist
-          else: _dst_dirlist = yield from softlistdir(dst); g.update(_dst_dirlist)
-        g = sorted(g)  # XXX it's not mandatory to sort. Add an fs_sync parameter for this?
+          else: _dst_dirlist = yield from softlistdir(dst); g_update(g, _dst_dirlist, 1)
+        g = sorted(g.items())  # XXX it's not mandatory to sort. Add an fs_sync parameter for this?
         #if suffix: g = sorted(g, key=lambda k: countendswith(k, suffix))  # backup files MUST be after update files.
-        for name in g:
-          args = (pathextend(srcname, name, sep=sep, altsep=altsep), pathextend(dstname, name, sep=sep, altsep=altsep), src_dir, dst_dir)
+        for kname, (_, _, srcbasename, dstbasename) in g:
+          args = (_os.path.join(srcname, srcbasename), _os.path.join(dstname, dstbasename), src_dir, dst_dir)
           try: yield from _sync(*args)
           except OSError:
             if ignore_sync_errors: pass
@@ -763,11 +793,6 @@ fs_sync.remove(dst, **kw)
       #######################################
       # START SYNC'ING src NODE TO dst NODE #
       #######################################
-
-      if exclude(srcname):
-        if not include(srcname):
-          #XXX if yield_excluded_nodes: yield('exclude', srcname, dstname, src_dir, dst_dir, src, dst)
-          return  # do not sync
 
       #if yield_nodes: yield ('node', srcname, dstname, src_dir, dst_dir, src, dst)  # XXX too much info yielded?
 
@@ -793,6 +818,15 @@ fs_sync.remove(dst, **kw)
               del _
           #elif copy_unsafe_links XXX
 
+      # if show is None and src_stats is not None:
+      #   if filter is None:
+      #     show, risk = True, True
+      #   else:
+      #     show, risk = parse_filter_result(filter(srcname, stat.S_ISDIR(src_stats.st_mode)))
+      #     if not show and not risk:
+      #       #XXX if yield_excluded_nodes: yield('exclude', srcname, dstname, src_dir, dst_dir, src, dst)
+      #       return  # do not sync
+
       if dst_lstats is None:
         if src_is_dst: dst_lstats = src_lstats
         else:
@@ -807,6 +841,26 @@ fs_sync.remove(dst, **kw)
           else:
             if stat.S_ISDIR(_.st_mode): dst_stats = _
             del _
+
+      if exclude is None:
+        show, risk = None, None
+      else:
+        if exclude(srcname):
+          show = True if include is not None and include(srcname) else False
+          risk = True if show or delete_excluded else False
+        else:
+          show, risk = True, True
+        # if not show and not risk:
+        #   #XXX if yield_excluded_nodes: yield('exclude', srcname, dstname, src_dir, dst_dir, src, dst)
+
+      if show is None:
+        if filter is None:
+          show, risk = True, True
+        else:
+          com_stats = src_stats or dst_stats
+          show, risk = parse_filter_result(filter(srcname, False if com_stats is None else stat.S_ISDIR(com_stats.st_mode)))
+          # if not show and not risk:
+          #   #XXX if yield_excluded_nodes: yield('exclude', srcname, dstname, src_dir, dst_dir, src, dst)
 
       if yield_nodes: yield ('node', srcname, dstname, src_dir, dst_dir, src, dst, src_lstats, dst_lstats, src_stats, dst_stats)  # XXX too much info yielded?
 
@@ -825,18 +879,19 @@ fs_sync.remove(dst, **kw)
         # src_noent                     delete                       : verbosedelete unlink
         # src_noent                                                  : verboseskip
         if   dst_stats is None and ignore_non_existing: yield from yf('absent'              ); return
-        if src_stats is None:
+        if src_stats is None or not show:
           if dst_stats is None: yield from yf(                        'uptodate'            ); return
           if   ignore_existing: yield from yf(                        'exists'              ); return
           if stat.S_ISDIR(dst_stats.st_mode):
             if dirs:
-              if delete:
+              if delete and risk:
                 if suffix and dstname.endswith(suffix): yield from yf('skip'                ); return
                 if backup: yield from yf(                             'delete',  dobackup() ); return
                 yield from yf(                                        'delete',  rmtree()   ); return
               yield from yf(                                          'skip'                ); return
             yield from yf(                                            'skip'                ); return
-          if     delete:
+          # if     delete and (risk or src_stats is not None and stat.S_ISDIR(src_stats.st_mode)):  # big statement... but it makes fs_sync consistent with rsync behavior.  But not sure this is what wa want.
+          if     delete and risk:
                 if suffix and dstname.endswith(suffix): yield from yf('skip'                ); return
                 if backup: yield from yf(                             'delete',  dobackup() ); return
                 yield from yf(                                        'delete',  unlink(dst)); return
