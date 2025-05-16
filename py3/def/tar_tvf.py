@@ -1,5 +1,5 @@
-# tar_tvf.py Version 1.0.0
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# tar_tvf.py Version 1.0.0-2
+# Copyright (c) 2020, 2024 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -30,7 +30,7 @@ def tar_tvf(file, **k):
     for entry in tar_readmetadatablocks(file):
       s = ""
       if tar_calculate_checksum(entry) != entry.checksum:
-        s += "/!\ invalid checksum" + sep
+        s += "/!\\ invalid checksum" + sep
       mode_bytes = (
         ("-hlcbdp-"[entry.type - 0x30 if entry.type else 0:])[:1] +
         ("r" if entry.mode & 0o400 else "-") +

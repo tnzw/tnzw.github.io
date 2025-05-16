@@ -1,5 +1,5 @@
-# toscript.py Version 0.1.3
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# toscript.py Version 0.1.4
+# Copyright (c) 2020, 2024 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -18,7 +18,7 @@ def toscript(desired_globals, keep_banners=True, keep_source=False):
     if not re.match("[_a-z][_a-z0-9]*(\\.[_a-z][_a-z0-9]*)*", _, re.I):
       raise ValueError(f"invalid global name {_}")
     var = eval(_)
-    if inspect.ismodule(var): imports.add(_)
+    if inspect.ismodule(var) and not isinstance(getattr(var, '_source', None), str): imports.add(_)
     elif isinstance(getattr(var, "_source", None), str):
       if keep_banners:
         script += var._source.strip("\n") + "\n"

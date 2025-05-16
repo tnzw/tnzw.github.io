@@ -1,5 +1,5 @@
-# PureWindowsPath2.py Version 2.1.0
-# Copyright (c) 2022-2023 <tnzw@github.triton.ovh>
+# PureWindowsPath2.py Version 2.1.1
+# Copyright (c) 2022-2023, 2025 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -38,6 +38,8 @@ You can convert from any PurePath-like by doing:
 
   __slots__ = ()
   def __new__(cls, *pathsegments, **replacements):
+    import warnings
+    warnings.warn('PurePosixPath2 is deprecated', DeprecationWarning)
 
     def find2(str, tuple, start=0):
       index = -1

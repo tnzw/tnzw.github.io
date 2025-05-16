@@ -1,5 +1,5 @@
-# datetime_is_summer_time.py Version 1.0.0
-# Copyright (c) 2021 Tristan Cavelier <t.cavelier@free.fr>
+# datetime_is_summer_time.py Version 1.0.0-2
+# Copyright (c) 2021, 2024 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -13,9 +13,9 @@ datetime_is_summer_time(datetime)
 Return True if the given `datetime` is in summer time, else False.
 
 Winter time is before last sunday from a complete week-end of march, 2am is 3am.
-/!\ between 2am and 3am ? `>= 2am` is summer time.
+/!\\ between 2am and 3am ? `>= 2am` is summer time.
 Summer time is before last sunday from a complete week-end of october, 3am is 2am.
-**/!\** between 3am and 2am ? `>= 2am` is winter time.
+**/!\\** between 3am and 2am ? `>= 2am` is winter time.
 """
   if 4 <= datetime.month <= 9: return True
   if datetime.month == 3:

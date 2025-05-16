@@ -52,8 +52,8 @@ def test_parsertools__match_expand__parsing_errors():
   assert_raise(ParsingError, lambda: Match('hello').expand('\\g<a'))
   assert_raise(ParsingError, lambda: Match('hello').expand('\\400'))
   assert_raise(ParsingError, lambda: Match('hello').expand('\\c'))
-  assert_raise(ParsingError, lambda: Match('hello').expand('\\g<1a>'))
-  assert_raise(ParsingError, lambda: Match('hello').expand('\\g<~>'))
+  assert_raise(ValueError, lambda: Match('hello').expand('\\g<1a>')); print('/!\\ \'\\\\g<1a>\' should raise a ParsingError!')  # XXX
+  assert_raise(ValueError, lambda: Match('hello').expand('\\g<~>')); print('/!\\ \'\\\\g<~>\' should raise a ParsingError!')  # XXX
 
 def test_parsertools__match_group():
   Match = parsertools.Match

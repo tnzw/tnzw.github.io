@@ -1,4 +1,4 @@
-# pysetupdi.py Version 20201022-2
+# pysetupdi.py Version 20201022-3
 # https://github.com/gwangyi/pysetupdi
 
 # MIT License
@@ -40,8 +40,8 @@ for hard_disk_drive in hard_disk_drives:
 You can also query information about devices by console command
 
 ~~~
-C:\> pysetupdi -g {4d36e967-e325-11ce-bfc1-08002be10318} list
-C:\> pysetupdi -i "SCSI\DISK&VEN_SAMSUN_&PROD_MZNTE256HMHP-000\4&103D1686&0&000000" get pdo_name
+C:\\> pysetupdi -g {4d36e967-e325-11ce-bfc1-08002be10318} list
+C:\\> pysetupdi -i "SCSI\\DISK&VEN_SAMSUN_&PROD_MZNTE256HMHP-000\\4&103D1686&0&000000" get pdo_name
 ~~~
 '''
   class pysetupdi(object): pass

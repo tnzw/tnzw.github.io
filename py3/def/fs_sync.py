@@ -1,7 +1,31 @@
-# fs_sync.py Version 3.2.0
+# fs_sync.py Version 3.2.2-2
+#
 #   This is free and unencumbered software released into the public domain.
-#   SPDX: Unlicense <http://unlicense.org/>
-#   Contributors: 2020-2024 <tnzw@github.triton.ovh>
+#
+#   Anyone is free to copy, modify, publish, use, compile, sell, or
+#   distribute this software, either in source code form or as a compiled
+#   binary, for any purpose, commercial or non-commercial, and by any
+#   means.
+#
+#   In jurisdictions that recognize copyright laws, the author or authors
+#   of this software dedicate any and all copyright interest in the
+#   software to the public domain. We make this dedication for the benefit
+#   of the public at large and to the detriment of our heirs and
+#   successors. We intend this dedication to be an overt act of
+#   relinquishment in perpetuity of all present and future rights to this
+#   software under copyright law.
+#
+#   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#   IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+#   OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+#   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+#   OTHER DEALINGS IN THE SOFTWARE.
+#
+#   For more information, please refer to <https://unlicense.org/>
+#
+#   Contributors: 2020-2025 <tnzw@github.triton.ovh>
 
 # Idea: make temporary file named like f'{tmp_prefix}{basename}.{random}{tmp_suffix}' where option tmp_prefix could be '.fs_sync.' and option tmp_suffix '.syncing.tmp'
 # Idea: add parameter use_ns_time=bool to use st_xtime_ns instead of st_xtime
@@ -31,7 +55,7 @@
 #   eg   src/a matches dst/b so sync("src/a" with "dst/b")
 def fs_sync():
 
-  def fs_sync(src, dst, *, follow_symlinks=False, source_directory=None, target_directory=None, src_noent_ok=None, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, inplace=None, temp_dir=None, update=None, dirs=None, links=None, copy_links=None, copy_dirlinks=None, keep_dirlinks=None, perms=None, executability=None, chmod=None, owner=None, group=None, devices=None, specials=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_non_existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, delete_excluded=None, force=None, chown=None, ignore_times=None, size_only=None, times_only=None, modify_window=None, src_time_offset=None, filter=None, exclude=None, include=None, name_key=None, file_matcher=None, yields=None, yield_all=None, yield_info=None, yield_debug=None, yield_nodes=None, yield_sync=None, yield_skip=None, yield_os_calls=None, yield_all_errors=None, yield_sync_errors=None, yield_listdir_errors=None, verbose=None, onverbose=None, ignore_errors=None, ignore_sync_errors=None, ignore_listdir_errors=None, ignore_exdev_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
+  def fs_sync(src, dst, *, follow_symlinks=False, source_directory=None, target_directory=None, src_noent_ok=None, check_path_types=True, content=None, head=None, archive=None, recursive=None, backup=None, backup_dir=None, suffix=None, inplace=None, temp_dir=None, update=None, dirs=None, links=None, copy_links=None, copy_dirlinks=None, keep_dirlinks=None, perms=None, executability=None, chmod=None, owner=None, group=None, devices=None, specials=None, times=None, omit_dir_times=None, omit_link_times=None, dry_run=None, existing=None, ignore_non_existing=None, ignore_existing=None, remove_source_files=None, remove_source_dirs=None, delete=None, delete_excluded=None, force=None, chown=None, ignore_times=None, size_only=None, times_only=None, modify_window=None, src_time_offset=None, filter=None, exclude=None, include=None, name_key=None, file_matcher=None, yields=None, yield_all=None, yield_info=None, yield_debug=None, yield_nodes=None, yield_sync=None, yield_skip=None, yield_os_calls=None, yield_all_errors=None, yield_sync_errors=None, yield_listdir_errors=None, verbose=None, onverbose=None, ignore_errors=None, ignore_sync_errors=None, ignore_listdir_errors=None, ignore_exdev_errors=None, onerror=None, buffer_size=None, as_func=None, os_module=None):
     """\
 fs_sync(src, dst, **opt)
 
@@ -45,6 +69,8 @@ fs_sync(src, dst, **opt)
     source_directory     synchronize src inner content to dst, implies target_directory (equiv: rsync src/ dst/)
     target_directory     synchronize src inside dst directory (equiv: rsync src dst)
     src_noent_ok         sync even if src does not exist
+    check_path_types     check if src, dst, backup_dir and temp_dir are of the same valid type
+                         using os.fspath()  (enabled by default)
 
     content              skip based on content, not mod-time & size
     head=INT             compare files content first bytes
@@ -147,7 +173,7 @@ fs_sync(src, dst, **opt)
   - os.symlink(), os.utime(), os.chmod(), os.chown(), os.mkdir(), os.unlink(), os.rmdir(), os.replace() are used to create/update/delete nodes;
   - os.open(), os.read(), os.write(), os.close(), os.O_RDONLY, os.O_WRONLY, os.O_CREAT, os.O_TRUNC, os.O_EXCL  (and optionaly os.O_BINARY, os.O_NOINHERIT, os.O_CLOEXEC) are used to copy/compare files content;
   - os.listdir() is used when *_directory=True or recursive=True;
-  - os.fspath() could be used if paths are not str or bytes;
+  - os.fspath() is used on given paths if check_path_types=True;
   - os.path.split(), os.path.join() is used for path manipulation.
 
 fs_sync.merge(src, dst, **kw)
@@ -188,8 +214,9 @@ fs_sync.remove(dst, **kw)
     ######################################
 
     _os = os if os_module is None else os_module
-    if not isinstance(src, (str, bytes)): src = _os.fspath(src)
-    if not isinstance(dst, (str, bytes)): dst = _os.fspath(dst)
+    if check_path_types:
+      src = _os.fspath(src)
+      dst = _os.fspath(dst)
     if source_directory:
       if target_directory is None: target_directory = True
       elif not target_directory: raise ValueError("target_directory=False conflicts with source_directory=True")
@@ -261,9 +288,14 @@ fs_sync.remove(dst, **kw)
     #elif existing is not None and bool(ignore_non_existing) != bool(existing): raise TypeError()
     if ignore_exdev_errors is None: ignore_exdev_errors = True
 
-    src + dst
-    if backup_dir and not isinstance(backup_dir, (str, bytes)): backup_dir = _os.fspath(backup_dir); dst + backup_dir
-    if temp_dir and not isinstance(temp_dir, (str, bytes)): temp_dir = _os.fspath(temp_dir); dst + temp_dir
+    if check_path_types:
+      if type(src) is not type(dst): raise TypeError('src and dst must be of the same type')
+      if backup_dir is not None:
+        backup_dir = _os.fspath(backup_dir)
+        if type(dst) is not type(backup_dir): raise TypeError('src, dst and backup_dir must be of the same type')
+      if temp_dir is not None:
+        temp_dir = _os.fspath(temp_dir)
+        if type(dst) is not type(temp_dir): raise TypeError('src, dst and temp_dir must be of the same type')
 
     custom_check = True if size_only or times_only or update or content or head is not None or file_matcher else False
 
@@ -772,11 +804,11 @@ fs_sync.remove(dst, **kw)
         # Use normcase to compare? Add a parameter like use_normcase? No, let the system handle cases by itself.
         g = {}
         if _src_dirlist is not None: g_update(g, _src_dirlist, 0)
-        elif source_directory: _src_dirlist = yield from softlistdir(src); g_update(g, _src_dirlist, 0)
+        elif source_directory: _src_dirlist = (yield from softlistdir(src)) or []; g_update(g, _src_dirlist, 0)
         if _dst_dirlist is not None: g_update(g, _dst_dirlist, 1)
         elif target_directory:
           if src_is_dst: _dst_dirlist = _src_dirlist
-          else: _dst_dirlist = yield from softlistdir(dst); g_update(g, _dst_dirlist, 1)
+          else: _dst_dirlist = (yield from softlistdir(dst)) or []; g_update(g, _dst_dirlist, 1)
         g = sorted(g.items())  # XXX it's not mandatory to sort. Add an fs_sync parameter for this?
         #if suffix: g = sorted(g, key=lambda k: countendswith(k, suffix))  # backup files MUST be after update files.
         for kname, (_, _, srcbasename, dstbasename) in g:
@@ -784,10 +816,9 @@ fs_sync.remove(dst, **kw)
           try: yield from _sync(*args)
           except OSError:
             if ignore_sync_errors: pass
-            else:
-              if yield_sync_errors and _yerr((yield ('sync_error', _sync, args, sys.exc_info()))): pass  # XXX check if this yield could raise a RuntimeError: generator ignored GeneratorExit()
-              elif onerror is not None: onerror(_sync, args, sys.exc_info())  # onerror() should only be used for `try: _sync()`
-              else: raise
+            elif yield_sync_errors and _yerr((yield ('sync_error', _sync, args, sys.exc_info()))): pass  # XXX check if this yield could raise a RuntimeError: generator ignored GeneratorExit()
+            elif onerror is not None: onerror(_sync, args, sys.exc_info())  # onerror() should only be used for `try: _sync()`
+            else: raise
         return
 
       #######################################

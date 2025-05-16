@@ -1,5 +1,5 @@
-# os_posix_getmountpointsbydrivelabel.py Version 2.0.1
-# Copyright (c) 2020 Tristan Cavelier <t.cavelier@free.fr>
+# os_posix_getmountpointsbydrivelabel.py Version 2.0.1-2
+# Copyright (c) 2020, 2024 <tnzw@github.triton.ovh>
 # This program is free software. It comes without any warranty, to
 # the extent permitted by applicable law. You can redistribute it
 # and/or modify it under the terms of the Do What The Fuck You Want
@@ -21,7 +21,7 @@ def os_posix_getmountpointsbydrivelabel():
 #"""
   o = {}
   lines = cp.stdout.split(b"\n")
-  label_length = len(re.match(b"^(LABEL\s+)MOUNTPOINT$", lines[0]).group(1))
+  label_length = len(re.match(b"^(LABEL\\s+)MOUNTPOINT$", lines[0]).group(1))
   matcher = re.compile(b"^(.{" + str(label_length).encode("ascii") + b"})(.*)$")
   for line in lines[1:]:
     m = matcher.match(line)
